@@ -9,20 +9,20 @@ public class createcsv {
 	
 	
 	 public static void generateCSV(List<TableMetaData> metaDataList) {
-	        String csvFileName = "table_metadata.csv";
+	        String FileName = "table_metadata.csv";
 	        
 	        
-	        String currentDirectory = System.getProperty("user.dir");
-	        String filePath = currentDirectory + File.separator + csvFileName;
+	        String Directory = System.getProperty("user.dir");
+	        String Path = Directory + File.separator + FileName;
 	        
 	        
-	        try (FileWriter writer = new FileWriter(csvFileName)) {
+	        try (FileWriter write = new FileWriter(FileName)) {
 	            // Write header
-	            writer.append("TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType\n");
+	            write.append("TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType\n");
 
 	            // Write meta data for each table
 	            for (TableMetaData metaData : metaDataList) {
-	                writer.append(metaData.getTableName())
+	                write.append(metaData.getTableName())
 	                        .append(",")
 	                        .append(metaData.getColumnName())
 	                        .append(",")
@@ -36,7 +36,7 @@ public class createcsv {
 	                        .append("\n");
 	            }
 
-	            System.out.println("CSV file has been created successfully.");
+	            System.out.println("CSV file created");
 	        } catch (IOException e) {
 	            e.printStackTrace();
 	        }
