@@ -1,5 +1,6 @@
 package database_project1;
 
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
@@ -9,7 +10,12 @@ public class createcsv {
 	
 	 public static void generateCSV(List<TableMetaData> metaDataList) {
 	        String csvFileName = "table_metadata.csv";
-
+	        
+	        
+	        String currentDirectory = System.getProperty("user.dir");
+	        String filePath = currentDirectory + File.separator + csvFileName;
+	        
+	        
 	        try (FileWriter writer = new FileWriter(csvFileName)) {
 	            // Write header
 	            writer.append("TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType\n");
