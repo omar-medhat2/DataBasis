@@ -18,7 +18,14 @@ public DBApp( ){
 		
 	}
 
-
+	public static int CurrentPageNumber(String PageName) {
+        int pageNumber = 0;
+            String[] parts = PageName.split("\\.");
+            String[] nameParts = parts[0].split("page");
+            pageNumber = Integer.parseInt(nameParts[1]);
+       
+        return pageNumber;
+    }
 	// following method creates one table only
 	// strClusteringKeyColumn is the name of the column that will be the primary
 	// key and the clustering column as well. The data type of that column will
@@ -92,9 +99,35 @@ public DBApp( ){
         metaDataList.add(new TableMetaData("CityShop", "Address", "java.lang.String", false, "AddrIndex", "B+tree"));
 
         // Generate CSV file
-        createcsv.generateCSV(metaDataList);
-		
-		
+        //createcsv.generateCSV(metaDataList);
+       
+      //  page.addTuple(new Tuple("Ahmed", 20, "Zamalek"));
+        //page.addTuple(new Tuple("John", 25, "New York"));
+
+        
+
+        // Load page from file
+//        int totalTuples = 40000;
+//        int N = 200;
+//        int totalPages = totalTuples / N;
+//
+//        for (int i = 0; i < totalPages; i++) {
+//            Page page = new Page();
+//            for (int j = 0; j < N; j++) {
+//                page.addTuple(new Tuple("Name" + (i * N + j), 20, "Address"));
+//            }
+//            page.saveToFile("page" + (i + 1) + ".bin");
+//        }
+  
+         System.out.println(CurrentPageNumber("page5"));
+        // Load and display the first page to verify
+//        Page loadedPage = Page.loadFromFile("page1.bin");
+//        if (loadedPage != null) {
+//            System.out.println("Loaded Page Contents: " + loadedPage.toString());
+//        } else {
+//            System.out.println("Failed to load page.");
+//        }
+//        
 		
 //			String strTableName = "Student";
 //			DBApp	dbApp = new DBApp( );
