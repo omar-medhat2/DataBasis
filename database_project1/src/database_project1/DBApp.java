@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class DBApp {
+	Table theTable;
 public DBApp( ){
 		
 	}
@@ -99,7 +100,7 @@ public DBApp( ){
         metaDataList.add(new TableMetaData("CityShop", "Address", "java.lang.String", false, "AddrIndex", "B+tree"));
 
         // Generate CSV file
-        //createcsv.generateCSV(metaDataList);
+        createcsv.generateCSV(metaDataList);
        
       //  page.addTuple(new Tuple("Ahmed", 20, "Zamalek"));
         //page.addTuple(new Tuple("John", 25, "New York"));

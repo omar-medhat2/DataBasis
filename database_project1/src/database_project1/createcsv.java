@@ -30,9 +30,9 @@ public class createcsv {
 	                        .append(",")
 	                        .append(Boolean.toString(metaData.isClusteringKey()))
 	                        .append(",")
-	                        .append(metaData.getIndexName() != null ? metaData.getIndexName() : "")
+	                        .append(metaData.getIndexName() != null ? metaData.getIndexName() : "Null")
 	                        .append(",")
-	                        .append(metaData.getIndexType() != null ? metaData.getIndexType() : "")
+	                        .append(metaData.getIndexType() != null ? metaData.getIndexType() : "Null")
 	                        .append("\n");
 	            }
 
