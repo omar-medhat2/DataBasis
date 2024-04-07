@@ -6,7 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class DBApp {
-	Table theTable;
+	public static  ArrayList<Table> theTables = new ArrayList<>();
 public DBApp( ){
 		
 	}
@@ -33,11 +33,17 @@ public DBApp( ){
 	// be passed in htblColNameType
 	// htblColNameValue will have the column name as key and the data 
 	// type as value
-	public void createTable(String strTableName, 
+	public static void createTable(String strTableName, 
 							String strClusteringKeyColumn,  
 							Hashtable<String,String> htblColNameType) throws DBAppException{
 								
-		throw new DBAppException("not implemented yet");
+				Table newTable = new Table();
+				newTable.strTableName = strTableName;
+				newTable.strClusteringKeyColumn = strClusteringKeyColumn;
+				createcsv.addtoCSV(newTable.strTableName,htblColNameType,strClusteringKeyColumn);
+				theTables.add(newTable);
+				
+		//throw new DBAppException("not implemented yet");
 	}
 
 
@@ -92,15 +98,20 @@ public DBApp( ){
 	public static void main( String[] args ){
 	
 	try{
-		List<TableMetaData> metaDataList = new ArrayList<>();
-        metaDataList.add(new TableMetaData("CityShop", "ID", "java.lang.Integer", true, "IDIndex", "B+tree"));
-        metaDataList.add(new TableMetaData("CityShop", "Name", "java.lang.String", false, null, null));
-        metaDataList.add(new TableMetaData("CityShop", "Number", "java.lang.Integer", false, "NumberIndex", "B+tree"));
-        metaDataList.add(new TableMetaData("CityShop", "Specialization", "java.lang.String", false, "SpecIndex", "B+tree"));
-        metaDataList.add(new TableMetaData("CityShop", "Address", "java.lang.String", false, "AddrIndex", "B+tree"));
+		Hashtable htblColNameType = new Hashtable( );
+		htblColNameType.put("id", "java.lang.Integer");
+		htblColNameType.put("name", "java.lang.String");
+		htblColNameType.put("gpa", "java.lang.double");
+		Hashtable htblColNameType2 = new Hashtable( );;
+		htblColNameType2.put("id2", "java.lang.double");
+		htblColNameType2.put("name2", "java.lang.double");
+		htblColNameType2.put("gpa2", "java.lang.double");
+		
+		createTable("Table1","id",htblColNameType);
+		createTable("Table2","id2",htblColNameType2);
 
         // Generate CSV file
-        createcsv.generateCSV(metaDataList);
+        //createcsv.generateCSV(metaDataList);
        
       //  page.addTuple(new Tuple("Ahmed", 20, "Zamalek"));
         //page.addTuple(new Tuple("John", 25, "New York"));

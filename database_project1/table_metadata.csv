@@ -1,6 +1,7 @@
 TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType
-CityShop,ID,java.lang.Integer,true,IDIndex,B+tree
-CityShop,Name,java.lang.String,false,Null,Null
-CityShop,Number,java.lang.Integer,false,NumberIndex,B+tree
-CityShop,Specialization,java.lang.String,false,SpecIndex,B+tree
-CityShop,Address,java.lang.String,false,AddrIndex,B+tree
+Table1,gpa,java.lang.double,false,Null,Null
+Table1,name,java.lang.String,false,Null,Null
+Table1,id,java.lang.Integer,true,Null,Null
+Table2,gpa2,java.lang.double,false,Null,Null
+Table2,id2,java.lang.double,true,Null,Null
+Table2,name2,java.lang.double,false,Null,Null
