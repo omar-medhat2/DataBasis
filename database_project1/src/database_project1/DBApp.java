@@ -1,6 +1,7 @@
 package database_project1;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
@@ -102,6 +103,10 @@ public DBApp( ){
 		htblColNameType.put("id", "java.lang.Integer");
 		htblColNameType.put("name", "java.lang.String");
 		htblColNameType.put("gpa", "java.lang.double");
+		//Tuple tupleObj = new Tuple(htblColNameType);
+	    //System.out.println( tupleObj);
+	      
+		
 		Hashtable htblColNameType2 = new Hashtable( );;
 		htblColNameType2.put("id2", "java.lang.double");
 		htblColNameType2.put("name2", "java.lang.double");
@@ -110,13 +115,21 @@ public DBApp( ){
 		createTable("Table1","id",htblColNameType);
 		createTable("Table2","id2",htblColNameType2);
 
+		Tuple tupleObj = new Tuple(htblColNameType);
+		Tuple tupleObj2 = new Tuple(htblColNameType2);
+		
+		
+		System.out.print(tupleObj.toString());
+		
+			
         // Generate CSV file
         //createcsv.generateCSV(metaDataList);
        
       //  page.addTuple(new Tuple("Ahmed", 20, "Zamalek"));
         //page.addTuple(new Tuple("John", 25, "New York"));
+		 
+		 
 
-        
 
         // Load page from file
 //        int totalTuples = 40000;
@@ -131,7 +144,7 @@ public DBApp( ){
 //            page.saveToFile("page" + (i + 1) + ".bin");
 //        }
   
-         System.out.println(CurrentPageNumber("page5"));
+         //System.out.println(CurrentPageNumber("page5"));
         // Load and display the first page to verify
 //        Page loadedPage = Page.loadFromFile("page1.bin");
 //        if (loadedPage != null) {
@@ -140,16 +153,16 @@ public DBApp( ){
 //            System.out.println("Failed to load page.");
 //        }
 //        
-		
+//		
 //			String strTableName = "Student";
 //			DBApp	dbApp = new DBApp( );
-//			
+////			
 //			Hashtable htblColNameType = new Hashtable( );
 //			htblColNameType.put("id", "java.lang.Integer");
 //			htblColNameType.put("name", "java.lang.String");
 //			htblColNameType.put("gpa", "java.lang.double");
 //			dbApp.createTable( strTableName, "id", htblColNameType );
-//			dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 //
 //			Hashtable htblColNameValue = new Hashtable( );
 //			htblColNameValue.put("id", new Integer( 2343432 ));
