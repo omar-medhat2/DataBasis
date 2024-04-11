@@ -1,10 +1,14 @@
 package database_project1;
 
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Vector;
 
 public class DBApp {
 	public static  ArrayList<Table> theTables = new ArrayList<>();
@@ -61,9 +65,89 @@ public DBApp( ){
 	// htblColNameValue must include a value for the primary key
 	public void insertIntoTable(String strTableName, 
 								Hashtable<String,Object>  htblColNameValue) throws DBAppException{
+		Table targetTable = null;
+        for (Table table : theTables) {
+            if (table.strTableName.equals(strTableName)) {
+                targetTable = table;
+                break;
+            }
+        }
+        if (targetTable == null) {
+            throw new DBAppException("Table not found: " + strTableName);
+        }
+
+        // Get the clustering key column
+        String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
+
+        // Get the value of the clustering key from the inserted data
+        Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+
+        // Find the correct page to insert the tuple
+        Page targetPage = null;
+        for (Page page : targetTable.pages) {
+            Tuple firstTuple = page.getFirstTuple();
+            Tuple lastTuple = page.getLastTuple();
+            Object firstKey = firstTuple != null ? firstTuple.getValue(clusteringKeyColumn) : null;
+            Object lastKey = lastTuple != null ? lastTuple.getValue(clusteringKeyColumn) : null;
+            if ((firstKey == null || ((Comparable) clusteringKeyValue).compareTo(firstKey) >= 0) &&
+                (lastKey == null || ((Comparable) clusteringKeyValue).compareTo(lastKey) <= 0)) {
+                targetPage = page;
+                break;
+            }
+        }
+        if (targetPage == null) {
+            // Create a new page if no suitable page is found
+            targetPage = new Page();
+            targetTable.pages.add(targetPage);
+        }
+/////////////////////////////////////////////////////////////////////////////////////
+        // Insert the tuple into the page
+        Vector<Tuple> temp = new Vector<>();
+        boolean inserted = false;
+        // Iterate through existing tuples to find the correct position to insert the new tuple
+        for (Tuple tuple : targetPage.getTuples()) {
+            // Compare primary key values
+            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+                // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
+                temp.add(new Tuple(htblColNameValue));
+                inserted = true; // Flag to indicate that the new tuple has been inserted
+            }
+            // Insert the current tuple into the temp vector
+            temp.add(tuple);
+        }
+
+        // If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
+        if (!inserted) {
+            temp.add(new Tuple(htblColNameValue));
+        }
+
+        // If the temp vector is still empty, it means the new tuple should be inserted at the end
+        if (temp.isEmpty()) {
+            temp.add(new Tuple(htblColNameValue));
+        }
+
+        // Replace the existing tuples with the temp vector
+        targetPage.setTuples(temp);
+
+        // Check if the page is full, then handle shifting if needed
+        if (targetPage.isFull()) {
+            // If it's the last page, create a new page
+            if (targetTable.pages.indexOf(targetPage) == targetTable.pages.size() - 1) {
+                Page newPage = new Page();
+                targetTable.pages.add(newPage);
+            } else {
+                // Otherwise, shift a row down to the following page
+                Page nextPage = targetTable.pages.get(targetTable.pages.indexOf(targetPage) + 1);
+                nextPage.shiftRow(targetPage);
+            }
+        }
+
+        // Save the table back to disk
+        targetTable.saveToFile(strTableName + ".ser");
+    }
+		//throw new DBAppException("not implemented yet");
 	
-		throw new DBAppException("not implemented yet");
-	}
 
 
 	// following method updates one row only
@@ -99,27 +183,22 @@ public DBApp( ){
 	public static void main( String[] args ){
 	
 	try{
-		Hashtable htblColNameType = new Hashtable( );
-		htblColNameType.put("id", "java.lang.Integer");
-		htblColNameType.put("name", "java.lang.String");
-		htblColNameType.put("gpa", "java.lang.double");
-		//Tuple tupleObj = new Tuple(htblColNameType);
-	    //System.out.println( tupleObj);
-	      
-		
-		Hashtable htblColNameType2 = new Hashtable( );;
-		htblColNameType2.put("id2", "java.lang.double");
-		htblColNameType2.put("name2", "java.lang.double");
-		htblColNameType2.put("gpa2", "java.lang.double");
-		
-		createTable("Table1","id",htblColNameType);
-		createTable("Table2","id2",htblColNameType2);
+//		Hashtable htblColNameType = new Hashtable( );
+//		htblColNameType.put("id", "java.lang.Integer");
+//		htblColNameType.put("name", "java.lang.String");
+//		htblColNameType.put("gpa", "java.lang.double");
+//		//Tuple tupleObj = new Tuple(htblColNameType);
+//	    //System.out.println( tupleObj);
+//	    
+//		
+//		Hashtable htblColNameType2 = new Hashtable( );
+//		htblColNameType2.put("id2", "java.lang.double");
+//		htblColNameType2.put("name2", "java.lang.double");
+//		htblColNameType2.put("gpa2", "java.lang.double");
+//		
+//		createTable("Table1","id",htblColNameType);
+//		createTable("Table2","id2",htblColNameType2);
 
-		Tuple tupleObj = new Tuple(htblColNameType);
-		Tuple tupleObj2 = new Tuple(htblColNameType2);
-		
-		
-		System.out.print(tupleObj.toString());
 		
 			
         // Generate CSV file
@@ -154,34 +233,71 @@ public DBApp( ){
 //        }
 //        
 //		
-//			String strTableName = "Student";
-//			DBApp	dbApp = new DBApp( );
+		String strTableName = "Student";
+		DBApp	dbApp = new DBApp( );
 ////			
-//			Hashtable htblColNameType = new Hashtable( );
-//			htblColNameType.put("id", "java.lang.Integer");
-//			htblColNameType.put("name", "java.lang.String");
-//			htblColNameType.put("gpa", "java.lang.double");
-//			dbApp.createTable( strTableName, "id", htblColNameType );
+			Hashtable htblColNameType = new Hashtable( );
+			htblColNameType.put("id", "java.lang.Integer");
+			htblColNameType.put("name", "java.lang.String");
+			htblColNameType.put("gpa", "java.lang.double");
+			dbApp.createTable( strTableName, "id", htblColNameType );
 			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 //
-//			Hashtable htblColNameValue = new Hashtable( );
-//			htblColNameValue.put("id", new Integer( 2343432 ));
-//			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 0.95 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
-//			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 453455 ));
-//			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 0.95 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
+			Hashtable htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343432 ));
+			htblColNameValue.put("name", new String("Ahmed Noor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+
+////		
+			htblColNameValue.clear( );
+			htblColNameValue.put("id", new Integer( 453455 ));
+			htblColNameValue.put("name", new String("Ahmed Noor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 5674567 ));
 //			htblColNameValue.put("name", new String("Dalia Noor" ) );
 //			htblColNameValue.put("gpa", new Double( 1.25 ) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //
+//			
+//			  // Step 1: Read the serialized table file
+			FileInputStream fileIn = new FileInputStream("Student.ser");
+
+            // Step 2: Deserialize the table object
+            ObjectInputStream objectIn = new ObjectInputStream(fileIn);
+            Table table = (Table) objectIn.readObject();
+            objectIn.close();
+////
+////            // Step 3: Access the tuples
+////            // Iterate through each page in the table
+////            for (Page page : table.getPages()) {
+////                // Access the tuples within the page
+////                Vector<Tuple> tuples = page.getTuples();
+////                for (Tuple tuple : tuples) {
+////                    // Access tuple attributes as needed
+////                    // For example:
+////                    Object attributeValue = tuple.getValue("id");
+////                    System.out.println("Attribute Value: " + attributeValue);
+////                }
+////            }
+			for (Page page : table.getPages()) {
+			    Vector<Tuple> tuples = page.getTuples();
+			    System.out.println("Number of tuples in page: " + tuples.size());
+			    
+			    for (Tuple tuple : tuples) {
+			        // Print out clustering key column value for each tuple
+			        Object clusteringKeyValue = tuple.getValue(table.getStrClusteringKeyColumn());
+			        System.out.println("Clustering key value: " + clusteringKeyValue);
+			        
+			        // Access tuple attributes as needed
+			        Object attributeValue = tuple.getValue("id");
+			        System.out.println("Attribute Value: " + attributeValue);
+			    }
+			}
+////			
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 23498 ));
 //			htblColNameValue.put("name", new String("John Noor" ) );
@@ -215,5 +331,10 @@ public DBApp( ){
 		catch(Exception exp){
 			exp.printStackTrace( );
 		}
+	}
+
+	private static InputStream FileInputStream(String string) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

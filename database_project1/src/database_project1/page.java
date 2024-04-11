@@ -4,59 +4,116 @@ import java.io.*;
 import java.util.*;
 
 class Tuple implements Serializable {
-	private Hashtable<String, String> hashtable;
-
-    public Tuple(Hashtable<String, String> hashtable) {
-        this.hashtable = new Hashtable<>(hashtable);
-        createAttributes();
+	private Hashtable<String, Object> tuples;
+	private String clusteringKeyColumn;
+	
+    public Tuple() {
+        this.tuples = new Hashtable<>();
     }
 
-    private void createAttributes() {
-        for (String attributeName : hashtable.keySet()) {
-            String attributeType = hashtable.get(attributeName);
-            switch (attributeType) {
-                case "java.lang.String":
-                    String stringValue = "";
-                    try {
-                        this.getClass().getDeclaredField(attributeName).set(this, stringValue);
-                    } catch (NoSuchFieldException | IllegalAccessException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case "java.lang.Integer":
-                    int intValue = 0;
-                    try {
-                        this.getClass().getDeclaredField(attributeName).set(this, intValue);
-                    } catch (NoSuchFieldException | IllegalAccessException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                case "java.lang.Double":
-                    double doubleValue = 0.0;
-                    try {
-                        this.getClass().getDeclaredField(attributeName).set(this, doubleValue);
-                    } catch (NoSuchFieldException | IllegalAccessException e) {
-                        e.printStackTrace();
-                    }
-                    break;
-                default:
-                    System.out.println("Unsupported attribute type");
-            }
+    public Tuple(Hashtable<String, Object> tuples) {
+        this.tuples = tuples;
+    }
+    
+    public Tuple(Hashtable<String, Object> tuples, String clusteringKeyColumn) {
+        this.tuples = tuples;
+        this.clusteringKeyColumn = clusteringKeyColumn;
+    }
+    
+    public void addTuple(String attribute, Object value) {
+        tuples.put(attribute, value);
+    }
+
+    public Object getValue(String attribute) {
+        return tuples.get(attribute);
+    }
+    public Object getClusteringKeyValue() {
+        return tuples.get(clusteringKeyColumn);
+    }
+    
+    public String serialize() throws IOException {
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+        objectOutputStream.writeObject(tuples);
+        objectOutputStream.close();
+        return Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
+    }
+
+    public static Tuple deserialize(String serializedData) throws IOException, ClassNotFoundException {
+        byte[] data = Base64.getDecoder().decode(serializedData);
+        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(data));
+        Tuple tuples = new Tuple();
+        tuples.tuples = (Hashtable<String, Object>) objectInputStream.readObject();
+        objectInputStream.close();
+        return tuples;
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder stringBuilder = new StringBuilder();
+        for (Map.Entry<String, Object> entry : tuples.entrySet()) {
+            stringBuilder.append(entry.getKey()).append("=").append(entry.getValue()).append("\n");
         }
+        return stringBuilder.toString();
     }
+}
+
+	
+	
+	
+
+    
+    
     
 	
 	
-}
+
 
 class Page implements Serializable {
     private static final int N = 200; 
     private Vector<Tuple> tuples;
-
+    private String strClusteringKeyColumn;
+    private Table parentTable;
+    
     public Page() {
         tuples = new Vector<>(N);
     }
 
+    public Page(String strClusteringKeyColumn) {
+        this.strClusteringKeyColumn = strClusteringKeyColumn;
+        tuples = new Vector<>();
+    }
+    
+    public Page(String strClusteringKeyColumn, Table parentTable) {
+        this.strClusteringKeyColumn = strClusteringKeyColumn;
+        this.parentTable = parentTable;
+        tuples = new Vector<>();
+    }
+    
+    public void insertTuple(Tuple tuple) {
+        tuples.add(tuple);
+    }
+    
+    public void setTuples(Vector<Tuple> tuples) {
+        this.tuples = tuples;
+    }
+    
+    public boolean isFull() {
+        return tuples.size() >= N;
+    }
+    
+    public void shiftRow(Page sourcePage) {
+        // Shift the last tuple of the sourcePage to this page
+        if (!sourcePage.tuples.isEmpty()) {
+            Tuple lastTuple = sourcePage.tuples.remove(sourcePage.tuples.size() - 1);
+            tuples.add(0, lastTuple);
+        }
+    }
+    
+    public Vector<Tuple> getTuples() {
+        return tuples;
+    }
+    
     public int CurrentPageNumber(String PageName) {
         int pageNumber = 0;
             String[] parts = PageName.split("\\.");
@@ -74,6 +131,39 @@ class Page implements Serializable {
         }
         return curr.toString();
     }
+    
+    public Tuple getFirstTuple() {
+        if (!tuples.isEmpty()) {
+            return tuples.firstElement(); // Return the first tuple
+        }
+        return null; // Return null if page is empty
+    }
+
+    public Tuple getLastTuple() {
+        if (!tuples.isEmpty()) {
+            return tuples.lastElement(); // Return the last tuple
+        }
+        return null; // Return null if page is empty
+    }
+    
+    public boolean contains(Object key) {
+        for (Page page : parentTable.getPages()) {
+           
+                // Check if the key is within the range of clustering keys for the tuples in the page
+                Tuple firstTuple = page.getFirstTuple();
+                Tuple lastTuple = page.getLastTuple();
+                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
+                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
+                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
+                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
+                    return true;
+                }
+            }
+        
+        return false;
+    }
+
+    
     public void saveToFile(String filename) {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
             out.writeObject(this);
