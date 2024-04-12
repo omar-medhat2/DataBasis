@@ -145,8 +145,8 @@ public DBApp( ){
 
         // Save the table back to disk
         targetTable.saveToFile(strTableName + ".ser");
-    }
-		//throw new DBAppException("not implemented yet");
+//		throw new DBAppException("not implemented yet");
+	}
 	
 
 
@@ -157,8 +157,65 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-	
-		throw new DBAppException("not implemented yet");
+	    Table targetTable = null;
+	    for (Table table : theTables) {
+	        if (table.getStrTableName().equals(strTableName)) {
+	            targetTable = table;
+	            break;
+	        }
+	    }
+	    
+	    if (targetTable == null) {
+	        throw new DBAppException("Table not found: " + strTableName);
+	    }
+
+	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
+	    
+	    // Check if the clustering key value is provided and matches the expected type
+//	    if (strClusteringKeyValue == null || !strClusteringKeyValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(clusteringKeyColumn))) {
+//	        throw new DBAppException("Invalid clustering key value type for table " + strTableName);
+//	    }
+	    
+	    // Locate the page and tuple to update
+	    Tuple tupleToUpdate = null;
+	    Page pageToUpdate = null;
+	    
+	    for (Page page : targetTable.getPages()) {
+	        for (Tuple tuple : page.getTuples()) {
+	        	//is strClusteringKeyValue always of type int?
+	        	System.out.println(tuple.getValue(clusteringKeyColumn));
+	            if (tuple.getValue(clusteringKeyColumn).equals(Integer.parseInt(strClusteringKeyValue))) {
+	                tupleToUpdate = tuple;
+	                pageToUpdate = page;
+	                break;
+	            }
+	        }
+	        if (tupleToUpdate != null) {
+	            break;
+	        }
+	    }
+	    
+	    if (tupleToUpdate == null) {
+	        throw new DBAppException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	    }
+	    
+	    // Update the tuple with new values
+	    for (String columnName : htblColNameValue.keySet()) {
+	        if (!columnName.equals(clusteringKeyColumn)) { // Skip clustering key column
+	            Object newValue = htblColNameValue.get(columnName);
+	            
+//	            // Check if the new value type matches the expected type
+//	            if (!newValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(columnName))) {
+//	                throw new DBAppException("Invalid data type for column " + columnName + " in table " + strTableName);
+//	            }
+	            
+	            tupleToUpdate.addTuple(columnName, newValue);
+	        }
+	    }
+	    
+	    // Save the updated page back to disk
+	    targetTable.saveToFile(strTableName + ".ser");
+//		throw new DBAppException("not implemented yet");
 	}
 
 
@@ -249,12 +306,13 @@ public DBApp( ){
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 
-////		
+//////		
 			htblColNameValue.clear( );
-			htblColNameValue.put("id", new Integer( 453455 ));
+			htblColNameValue.put("id", new Integer( 500000 ));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-			htblColNameValue.put("gpa", new Double( 0.95 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue.put("gpa", new Double( 0.8 ) );
+////			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.updateTable(strTableName, "2343432", htblColNameValue);
 
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 5674567 ));
