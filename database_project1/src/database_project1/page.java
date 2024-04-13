@@ -146,22 +146,22 @@ class Page implements Serializable {
         return null; // Return null if page is empty
     }
     
-    public boolean contains(Object key) {
-        for (Page page : parentTable.getPages()) {
-           
-                // Check if the key is within the range of clustering keys for the tuples in the page
-                Tuple firstTuple = page.getFirstTuple();
-                Tuple lastTuple = page.getLastTuple();
-                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
-                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
-                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
-                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
-                    return true;
-                }
-            }
-        
-        return false;
-    }
+//    public boolean contains(Object key) {
+//        for (String page : parentTable.getPages()) {
+//           
+//                // Check if the key is within the range of clustering keys for the tuples in the page
+//                Tuple firstTuple = page.getFirstTuple();
+//                Tuple lastTuple = page.getLastTuple();
+//                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
+//                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
+//                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
+//                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
+//                    return true;
+//                }
+//            }
+//        
+//        return false;
+//    }
 
     
     public void saveToFile(String filename) {

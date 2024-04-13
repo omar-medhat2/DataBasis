@@ -3,6 +3,8 @@ package database_project1;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
@@ -12,8 +14,8 @@ public class createcsv {
 	
 	public static void addtoCSV(String tableName, Hashtable<String, String> columnTypes, String clusteringKey) {
         String fileName = "table_metadata.csv";
-        String directory = System.getProperty("user.dir");
-        String path = directory + File.separator + fileName;
+//        String directory = System.getProperty("user.dir");
+//        String path = directory + File.separator + fileName;
 
         try (FileWriter write = new FileWriter(fileName, true)) {
             // Check if the file exists and if not, write the header
@@ -45,4 +47,24 @@ public class createcsv {
             e.printStackTrace();
         }
     }
+	public static String getType(String strTableName, String strColName) throws IOException {
+	        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+	        for (String line : lines) {
+	            String[] fields = line.split(",");
+	            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName)) {
+	                return fields[2];
+	            }
+	        }
+	        return null;
+	}
+	public static String getCluster(String strTableName) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+        for (String line : lines) {
+            String[] fields = line.split(",");
+            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[3].equals("TRUE")) {
+                return fields[1];
+            }
+        }
+        return null;
+}
 }

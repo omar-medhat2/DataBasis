@@ -1,6 +1,7 @@
 package database_project1;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
@@ -157,64 +158,64 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-	    Table targetTable = null;
-	    for (Table table : theTables) {
-	        if (table.getStrTableName().equals(strTableName)) {
-	            targetTable = table;
+		Table targetTable = null;
+        for (Table table : theTables) {
+            if (table.strTableName.equals(strTableName)) {
+                targetTable = table;
+                break;
+            }
+        }
+        if (targetTable == null) {
+            throw new DBAppException("Table not found: " + strTableName);
+        }
+        
+	    Page targetPage = null;
+		try {
+			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	    
+	    if (targetPage == null) {
+	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	    }
+	    
+	    // Find the tuple to update
+	    Tuple targetTuple = null;
+	    for (Tuple tuple : targetPage.getTuples()) {
+	        if (strClusteringKeyValue.equals(tuple.getClusteringKeyValue())) {
+	            targetTuple = tuple;
 	            break;
 	        }
 	    }
 	    
-	    if (targetTable == null) {
-	        throw new DBAppException("Table not found: " + strTableName);
-	    }
-
-	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-	    
-	    // Check if the clustering key value is provided and matches the expected type
-//	    if (strClusteringKeyValue == null || !strClusteringKeyValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(clusteringKeyColumn))) {
-//	        throw new DBAppException("Invalid clustering key value type for table " + strTableName);
-//	    }
-	    
-	    // Locate the page and tuple to update
-	    Tuple tupleToUpdate = null;
-	    Page pageToUpdate = null;
-	    
-	    for (Page page : targetTable.getPages()) {
-	        for (Tuple tuple : page.getTuples()) {
-	        	//is strClusteringKeyValue always of type int?
-	        	System.out.println(tuple.getValue(clusteringKeyColumn));
-	            if (tuple.getValue(clusteringKeyColumn).equals(Integer.parseInt(strClusteringKeyValue))) {
-	                tupleToUpdate = tuple;
-	                pageToUpdate = page;
-	                break;
-	            }
-	        }
-	        if (tupleToUpdate != null) {
-	            break;
-	        }
-	    }
-	    
-	    if (tupleToUpdate == null) {
-	        throw new DBAppException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	    if (targetTuple == null) {
+	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
 	    
 	    // Update the tuple with new values
 	    for (String columnName : htblColNameValue.keySet()) {
-	        if (!columnName.equals(clusteringKeyColumn)) { // Skip clustering key column
-	            Object newValue = htblColNameValue.get(columnName);
-	            
-//	            // Check if the new value type matches the expected type
-//	            if (!newValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(columnName))) {
-//	                throw new DBAppException("Invalid data type for column " + columnName + " in table " + strTableName);
-//	            }
-	            
-	            tupleToUpdate.addTuple(columnName, newValue);
+	        if (!columnName.equals(targetTable.getStrClusteringKeyColumn())) { // Skip clustering key column
+	        	Object newValue;
+	        	if (columnName.equals(targetTable.getStrClusteringKeyColumn())) {
+	        	    // Handle clustering key value differently if needed
+	        	    newValue = htblColNameValue.get(columnName);
+	        	} else {
+	        	    // Handle other columns
+	        	    newValue = htblColNameValue.get(columnName);
+	        	}
+
+	            targetTuple.addTuple(columnName, newValue);
 	        }
 	    }
 	    
 	    // Save the updated page back to disk
 	    targetTable.saveToFile(strTableName + ".ser");
+//		throw new DBAppException("not implemented yet");
 //		throw new DBAppException("not implemented yet");
 	}
 
@@ -298,21 +299,22 @@ public DBApp( ){
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
 			dbApp.createTable( strTableName, "id", htblColNameType );
-			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
-//
+//			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+////
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343432 ));
+			htblColNameValue.put("id", new Integer( 1 ));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-
-//////		
+//
+////////		
 			htblColNameValue.clear( );
-			htblColNameValue.put("id", new Integer( 500000 ));
+//			htblColNameValue.put("id", new Integer( 1 ));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.8 ) );
-////			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			dbApp.updateTable(strTableName, "2343432", htblColNameValue);
+//			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.updateTable(strTableName, "1", htblColNameValue);
+			htblColNameValue.clear( );
 
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 5674567 ));
@@ -331,16 +333,16 @@ public DBApp( ){
 ////
 ////            // Step 3: Access the tuples
 ////            // Iterate through each page in the table
-////            for (Page page : table.getPages()) {
-////                // Access the tuples within the page
-////                Vector<Tuple> tuples = page.getTuples();
-////                for (Tuple tuple : tuples) {
-////                    // Access tuple attributes as needed
-////                    // For example:
-////                    Object attributeValue = tuple.getValue("id");
-////                    System.out.println("Attribute Value: " + attributeValue);
-////                }
-////            }
+//            for (Page page : table.getPages()) {
+//                // Access the tuples within the page
+//                Vector<Tuple> tuples = page.getTuples();
+//                for (Tuple tuple : tuples) {
+//                    // Access tuple attributes as needed
+//                    // For example:
+//                    Object attributeValue = tuple.getValue("id");
+//                    System.out.println("Attribute Value: " + attributeValue);
+//                }
+//            }
 			for (Page page : table.getPages()) {
 			    Vector<Tuple> tuples = page.getTuples();
 			    System.out.println("Number of tuples in page: " + tuples.size());
