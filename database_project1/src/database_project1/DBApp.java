@@ -223,11 +223,58 @@ public DBApp( ){
 	// htblColNameValue holds the key and value. This will be used in search 
 	// to identify which rows/tuples to delete. 	
 	// htblColNameValue enteries are ANDED together
-	public void deleteFromTable(String strTableName, 
-								Hashtable<String,Object> htblColNameValue) throws DBAppException{
-	
-		throw new DBAppException("not implemented yet");
-	}
+	public static void deleteFromTable(String strTableName, 
+			Hashtable<String,Object> htblColNameValue) throws DBAppException{
+
+
+		Table targetTable = null;
+		for (Table table : theTables) {
+			if (table.getStrTableName().equals(strTableName)) {
+			targetTable = table;
+			break;
+				}
+			}
+			
+			if (targetTable == null) {
+			throw new DBAppException("Table not found: " + strTableName);
+			}
+			
+			// Iterate over pages in the table
+			for (Page page : targetTable.getPages()) {
+			// Iterate over tuples in the page
+			Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+			while (tupleIterator.hasNext()) {
+			Tuple tuple = tupleIterator.next();
+			
+			// Check if the tuple matches all conditions in the hashtable
+			boolean allConditions = true;
+			for (String attributeName : htblColNameValue.keySet()) {
+			Object attributeValue = htblColNameValue.get(attributeName);
+			if (!tuple.getValue(attributeName).equals(attributeValue)) {
+			    allConditions = false;
+			    break;
+			}
+			}
+			
+			// If the tuple matches all conditions, remove it from the tuple vector
+			if (allConditions) {
+			tupleIterator.remove();
+			// Check if the page is empty after removing the tuple
+				if (page.getTuples().isEmpty()) {
+			    // Remove the empty page from the table
+					targetTable.getPages().remove(page);
+						}
+					}
+				}
+			}
+			
+			
+			
+			// Save the updated page(s) back to disk
+			for (Page page : targetTable.getPages()) {
+			page.saveToFile(strTableName + ".ser");
+			}
+			}
 
 
 	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, 
