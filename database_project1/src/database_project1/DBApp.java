@@ -65,7 +65,10 @@ public DBApp( ){
 	// htblColNameValue must include a value for the primary key
 	public void insertIntoTable(String strTableName, 
 								Hashtable<String,Object>  htblColNameValue) throws DBAppException{
+		
+		
 		Table targetTable = null;
+		//Table targetTable = null;
         for (Table table : theTables) {
             if (table.strTableName.equals(strTableName)) {
                 targetTable = table;
@@ -74,17 +77,23 @@ public DBApp( ){
         }
         if (targetTable == null) {
             throw new DBAppException("Table not found: " + strTableName);
-        }
+       }			
+        //Table targetTable = Table.loadFromFile(strTableName + ".ser");
+        
 
+//        if (targetTable == null) {
+//            throw new DBAppException("Table not found: " + strTableName);
+//        }
+//////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Get the clustering key column
-        String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
+	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
 
         // Get the value of the clustering key from the inserted data
         Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
         // Find the correct page to insert the tuple
         Page targetPage = null;
-        for (Page page : targetTable.pages) {
+        for (Page page : targetTable.getPages()) {
             Tuple firstTuple = page.getFirstTuple();
             Tuple lastTuple = page.getLastTuple();
             Object firstKey = firstTuple != null ? firstTuple.getValue(clusteringKeyColumn) : null;
@@ -98,10 +107,13 @@ public DBApp( ){
         if (targetPage == null) {
             // Create a new page if no suitable page is found
             targetPage = new Page();
-            targetTable.pages.add(targetPage);
+            targetTable.getPages().add(targetPage);
         }
-/////////////////////////////////////////////////////////////////////////////////////
+        
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Insert the tuple into the page
+        if (!targetPage.isFull())
+        {
         Vector<Tuple> temp = new Vector<>();
         boolean inserted = false;
         // Iterate through existing tuples to find the correct position to insert the new tuple
@@ -126,21 +138,61 @@ public DBApp( ){
         if (temp.isEmpty()) {
             temp.add(new Tuple(htblColNameValue));
         }
-
         // Replace the existing tuples with the temp vector
         targetPage.setTuples(temp);
-
+        }
         // Check if the page is full, then handle shifting if needed
         if (targetPage.isFull()) {
             // If it's the last page, create a new page
-            if (targetTable.pages.indexOf(targetPage) == targetTable.pages.size() - 1) {
+            if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
                 Page newPage = new Page();
-                targetTable.pages.add(newPage);
+                targetTable.getPages().add(newPage);
             } else {
                 // Otherwise, shift a row down to the following page
-                Page nextPage = targetTable.pages.get(targetTable.pages.indexOf(targetPage) + 1);
-                nextPage.shiftRow(targetPage);
+                Page nextPage = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
+               // nextPage.shiftRow(targetPage);
+                
+                Tuple shiftedTuple = targetPage.getLastTuple();
+                targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
+                
+                
+                Vector<Tuple> temp = new Vector<>();
+                boolean inserted = false;
+                // Iterate through existing tuples to find the correct position to insert the new tuple
+                for (Tuple tuple : targetPage.getTuples()) {
+                    // Compare primary key values
+                    Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+                    if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+                        // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
+                        temp.add(new Tuple(htblColNameValue));
+                        inserted = true; // Flag to indicate that the new tuple has been inserted
+                    }
+                    // Insert the current tuple into the temp vector
+                    temp.add(tuple);
+                }
+
+                // If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
+                if (!inserted) {
+                    temp.add(new Tuple(htblColNameValue));
+                }
+
+                // If the temp vector is still empty, it means the new tuple should be inserted at the end
+                if (temp.isEmpty()) {
+                    temp.add(new Tuple(htblColNameValue));
+                }
+                // Replace the existing tuples with the temp vector
+                targetPage.setTuples(temp);
+                
+                Vector<Tuple> tmp = new Vector<>();
+                tmp.add(shiftedTuple); 
+                for (Tuple tuple : nextPage.getTuples()) {
+                    if (!tuple.equals(shiftedTuple)) {
+                        tmp.add(tuple); 
+                    }
+                }
+                nextPage.setTuples(tmp);
             }
+            
         }
 
         // Save the table back to disk
@@ -248,8 +300,8 @@ public DBApp( ){
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-
-////		
+//
+//////		
 			htblColNameValue.clear( );
 			htblColNameValue.put("id", new Integer( 453455 ));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
@@ -263,13 +315,8 @@ public DBApp( ){
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //
 //			
-//			  // Step 1: Read the serialized table file
-			FileInputStream fileIn = new FileInputStream("Student.ser");
 
-            // Step 2: Deserialize the table object
-            ObjectInputStream objectIn = new ObjectInputStream(fileIn);
-            Table table = (Table) objectIn.readObject();
-            objectIn.close();
+			
 ////
 ////            // Step 3: Access the tuples
 ////            // Iterate through each page in the table
@@ -283,6 +330,14 @@ public DBApp( ){
 ////                    System.out.println("Attribute Value: " + attributeValue);
 ////                }
 ////            }
+			///////////////////////////////////////////////////////////
+			FileInputStream fileIn = new FileInputStream("Student.ser");
+
+            // Step 2: Deserialize the table object
+            ObjectInputStream objectIn = new ObjectInputStream(fileIn);
+            Table table = (Table) objectIn.readObject();
+            objectIn.close();
+			
 			for (Page page : table.getPages()) {
 			    Vector<Tuple> tuples = page.getTuples();
 			    System.out.println("Number of tuples in page: " + tuples.size());

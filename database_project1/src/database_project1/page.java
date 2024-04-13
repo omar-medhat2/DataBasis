@@ -31,21 +31,21 @@ class Tuple implements Serializable {
         return tuples.get(clusteringKeyColumn);
     }
     
-    public String serialize() throws IOException {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-        objectOutputStream.writeObject(tuples);
-        objectOutputStream.close();
-        return Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
+    public void saveToFile(String filename) {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
+            out.writeObject(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
-
-    public static Tuple deserialize(String serializedData) throws IOException, ClassNotFoundException {
-        byte[] data = Base64.getDecoder().decode(serializedData);
-        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(data));
-        Tuple tuples = new Tuple();
-        tuples.tuples = (Hashtable<String, Object>) objectInputStream.readObject();
-        objectInputStream.close();
-        return tuples;
+    public static Tuple loadFromFile(String filename) {
+        Tuple tuple = null;
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(filename))) {
+            tuple = (Tuple) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return tuple;
     }
 
     @Override
@@ -103,7 +103,6 @@ class Page implements Serializable {
     }
     
     public void shiftRow(Page sourcePage) {
-        // Shift the last tuple of the sourcePage to this page
         if (!sourcePage.tuples.isEmpty()) {
             Tuple lastTuple = sourcePage.tuples.remove(sourcePage.tuples.size() - 1);
             tuples.add(0, lastTuple);
