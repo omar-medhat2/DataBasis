@@ -65,87 +65,7 @@ public DBApp( ){
 	// htblColNameValue must include a value for the primary key
 	public void insertIntoTable(String strTableName, 
 								Hashtable<String,Object>  htblColNameValue) throws DBAppException{
-		Table targetTable = null;
-        for (Table table : theTables) {
-            if (table.strTableName.equals(strTableName)) {
-                targetTable = table;
-                break;
-            }
-        }
-        if (targetTable == null) {
-            throw new DBAppException("Table not found: " + strTableName);
-        }
-
-        // Get the clustering key column
-        String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
-
-        // Get the value of the clustering key from the inserted data
-        Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
-
-        // Find the correct page to insert the tuple
-        Page targetPage = null;
-        for (Page page : targetTable.pages) {
-            Tuple firstTuple = page.getFirstTuple();
-            Tuple lastTuple = page.getLastTuple();
-            Object firstKey = firstTuple != null ? firstTuple.getValue(clusteringKeyColumn) : null;
-            Object lastKey = lastTuple != null ? lastTuple.getValue(clusteringKeyColumn) : null;
-            if ((firstKey == null || ((Comparable) clusteringKeyValue).compareTo(firstKey) >= 0) &&
-                (lastKey == null || ((Comparable) clusteringKeyValue).compareTo(lastKey) <= 0)) {
-                targetPage = page;
-                break;
-            }
-        }
-        if (targetPage == null) {
-            // Create a new page if no suitable page is found
-            targetPage = new Page();
-            targetTable.pages.add(targetPage);
-        }
-/////////////////////////////////////////////////////////////////////////////////////
-        // Insert the tuple into the page
-        Vector<Tuple> temp = new Vector<>();
-        boolean inserted = false;
-        // Iterate through existing tuples to find the correct position to insert the new tuple
-        for (Tuple tuple : targetPage.getTuples()) {
-            // Compare primary key values
-            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-                // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
-                temp.add(new Tuple(htblColNameValue));
-                inserted = true; // Flag to indicate that the new tuple has been inserted
-            }
-            // Insert the current tuple into the temp vector
-            temp.add(tuple);
-        }
-
-        // If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
-        if (!inserted) {
-            temp.add(new Tuple(htblColNameValue));
-        }
-
-        // If the temp vector is still empty, it means the new tuple should be inserted at the end
-        if (temp.isEmpty()) {
-            temp.add(new Tuple(htblColNameValue));
-        }
-
-        // Replace the existing tuples with the temp vector
-        targetPage.setTuples(temp);
-
-        // Check if the page is full, then handle shifting if needed
-        if (targetPage.isFull()) {
-            // If it's the last page, create a new page
-            if (targetTable.pages.indexOf(targetPage) == targetTable.pages.size() - 1) {
-                Page newPage = new Page();
-                targetTable.pages.add(newPage);
-            } else {
-                // Otherwise, shift a row down to the following page
-                Page nextPage = targetTable.pages.get(targetTable.pages.indexOf(targetPage) + 1);
-                nextPage.shiftRow(targetPage);
-            }
-        }
-
-        // Save the table back to disk
-        targetTable.saveToFile(strTableName + ".ser");
-//		throw new DBAppException("not implemented yet");
+		
 	}
 	
 
@@ -157,76 +77,65 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-	    Table targetTable = null;
-	    for (Table table : theTables) {
-	        if (table.getStrTableName().equals(strTableName)) {
-	            targetTable = table;
-	            break;
-	        }
-	    }
-	    
-	    if (targetTable == null) {
-	        throw new DBAppException("Table not found: " + strTableName);
-	    }
-
-	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-	    
-	    // Check if the clustering key value is provided and matches the expected type
-//	    if (strClusteringKeyValue == null || !strClusteringKeyValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(clusteringKeyColumn))) {
-//	        throw new DBAppException("Invalid clustering key value type for table " + strTableName);
-//	    }
-	    
-	    // Locate the page and tuple to update
-	    Tuple tupleToUpdate = null;
-	    Page pageToUpdate = null;
-	    
-	    for (Page page : targetTable.getPages()) {
-	        for (Tuple tuple : page.getTuples()) {
-	        	//is strClusteringKeyValue always of type int?
-	        	System.out.println(tuple.getValue(clusteringKeyColumn));
-	            if (tuple.getValue(clusteringKeyColumn).equals(Integer.parseInt(strClusteringKeyValue))) {
-	                tupleToUpdate = tuple;
-	                pageToUpdate = page;
-	                break;
-	            }
-	        }
-	        if (tupleToUpdate != null) {
-	            break;
-	        }
-	    }
-	    
-	    if (tupleToUpdate == null) {
-	        throw new DBAppException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
-	    }
-	    
-	    // Update the tuple with new values
-	    for (String columnName : htblColNameValue.keySet()) {
-	        if (!columnName.equals(clusteringKeyColumn)) { // Skip clustering key column
-	            Object newValue = htblColNameValue.get(columnName);
-	            
-//	            // Check if the new value type matches the expected type
-//	            if (!newValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(columnName))) {
-//	                throw new DBAppException("Invalid data type for column " + columnName + " in table " + strTableName);
-//	            }
-	            
-	            tupleToUpdate.addTuple(columnName, newValue);
-	        }
-	    }
-	    
-	    // Save the updated page back to disk
-	    targetTable.saveToFile(strTableName + ".ser");
-//		throw new DBAppException("not implemented yet");
+	   
 	}
 
 
 	// following method could be used to delete one or more rows.
 	// htblColNameValue holds the key and value. This will be used in search 
 	// to identify which rows/tuples to delete. 	
-	// htblColNameValue enteries are ANDED together
-	public void deleteFromTable(String strTableName, 
+	// htblColNameValue entries are ANDED together
+	public static void deleteFromTable(String strTableName, 
 								Hashtable<String,Object> htblColNameValue) throws DBAppException{
 	
-		throw new DBAppException("not implemented yet");
+		
+		Table targetTable = null;
+		for (Table table : theTables) {
+		    if (table.getStrTableName().equals(strTableName)) {
+		        targetTable = table;
+		        break;
+		    }
+		}
+
+		if (targetTable == null) {
+		    throw new DBAppException("Table not found: " + strTableName);
+		}
+		
+		// Iterate over pages in the table
+		for (Page page : targetTable.getPages()) {
+		    // Iterate over tuples in the page
+		    Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+		    while (tupleIterator.hasNext()) {
+		        Tuple tuple = tupleIterator.next();
+		        
+		        // Check if the tuple matches all conditions in the hashtable
+		        boolean allConditions = true;
+		        for (String attributeName : htblColNameValue.keySet()) {
+		            Object attributeValue = htblColNameValue.get(attributeName);
+		            if (!tuple.getValue(attributeName).equals(attributeValue)) {
+		                allConditions = false;
+		                break;
+		            }
+		        }
+		        
+		        // If the tuple matches all conditions, remove it from the tuple vector
+		        if (allConditions) {
+		            tupleIterator.remove();
+		            // Check if the page is empty after removing the tuple
+		            if (page.getTuples().isEmpty()) {
+		                // Remove the empty page from the table
+		                targetTable.getPages().remove(page);
+		            }
+		        }
+		    }
+		}
+	    
+	    
+
+	    // Save the updated page(s) back to disk
+	    for (Page page : targetTable.getPages()) {
+	        page.saveToFile(strTableName + ".ser");
+	    }
 	}
 
 
@@ -305,14 +214,26 @@ public DBApp( ){
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343433 ));
+			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			Hashtable htblColNameValueforDelete = new Hashtable( );
+			htblColNameValueforDelete.put("name", new String("Ahmed Soroor" ));
+			deleteFromTable(strTableName,htblColNameValueforDelete);
+			
+			
+			
+			
 
 //////		
-			htblColNameValue.clear( );
-			htblColNameValue.put("id", new Integer( 500000 ));
-			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-			htblColNameValue.put("gpa", new Double( 0.8 ) );
+			//htblColNameValue.clear( );
+			//htblColNameValue.put("id", new Integer( 500000 ));
+			//htblColNameValue.put("name", new String("Ahmed Noor" ) );
+			//htblColNameValue.put("gpa", new Double( 0.8 ) );
 ////			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			dbApp.updateTable(strTableName, "2343432", htblColNameValue);
+			//dbApp.updateTable(strTableName, "2343432", htblColNameValue);
 
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 5674567 ));
