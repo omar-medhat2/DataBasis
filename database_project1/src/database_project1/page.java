@@ -113,12 +113,20 @@ class Page implements Serializable {
         return tuples;
     }
     
-    public int CurrentPageNumber(String PageName) {
-        int pageNumber = 0;
-            String[] parts = PageName.split("\\.");
-            String[] nameParts = parts[0].split("page");
-            pageNumber = Integer.parseInt(nameParts[1]);
-       
+    public static int getPageNumber(String pageName) {
+    	
+        StringBuilder pageNumberStr = new StringBuilder();
+
+        for (int i = 0; i < pageName.length(); i++) {
+            char ch = pageName.charAt(i);
+            if (Character.isDigit(ch)) {
+                pageNumberStr.append(ch);
+            } else if (pageNumberStr.length() > 0) {
+                break;
+            }
+        }
+        int pageNumber = Integer.parseInt(pageNumberStr.toString());
+
         return pageNumber;
     }
     @Override
@@ -144,24 +152,6 @@ class Page implements Serializable {
         }
         return null; // Return null if page is empty
     }
-    
-//    public boolean contains(Object key) {
-//        for (String page : parentTable.getPages()) {
-//           
-//                // Check if the key is within the range of clustering keys for the tuples in the page
-//                Tuple firstTuple = page.getFirstTuple();
-//                Tuple lastTuple = page.getLastTuple();
-//                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
-//                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
-//                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
-//                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
-//                    return true;
-//                }
-//            }
-//        
-//        return false;
-//    }
-
     
     public void saveToFile(String filename) {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {

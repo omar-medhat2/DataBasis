@@ -28,6 +28,15 @@ public class Table implements Serializable{
         this.strClusteringKeyColumn = strClusteringKeyColumn;
         this.pages = new Vector<>();
     }
+	
+	public String getLastPage()
+	{
+		if (pages.isEmpty())
+			return "Page-1";
+		else
+		return pages.lastElement();
+	}
+	
 	public Page retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
 	    int comparisonResult = 1;
 	    Page currentPage = null;
@@ -57,23 +66,6 @@ public class Table implements Serializable{
 	    return currentPage;
 	}
 
-//	
-//	 public boolean contains(Object key) {
-//	        for (String page : pages) {
-//	           
-//	                // Check if the key is within the range of clustering keys for the tuples in the page
-//	                Tuple firstTuple = page.getFirstTuple();
-//	                Tuple lastTuple = page.getLastTuple();
-//	                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
-//	                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
-//	                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
-//	                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
-//	                    return true;
-//	                }
-//	            }
-//	        
-//	        return false;
-//	    }
 	
 	public String getStrClusteringKeyColumn() {
 		return strClusteringKeyColumn;

@@ -25,14 +25,35 @@ public DBApp( ){
 		
 	}
 
-	public static int CurrentPageNumber(String PageName) {
-        int pageNumber = 0;
-            String[] parts = PageName.split("\\.");
-            String[] nameParts = parts[0].split("page");
-            pageNumber = Integer.parseInt(nameParts[1]);
-       
-        return pageNumber;
-    }
+	public int getPageNumber(String pageName) {
+	    StringBuilder pageNumberStr = new StringBuilder();
+	    boolean isNegative = false;
+
+	    for (int i = 0; i < pageName.length(); i++) {
+	        char ch = pageName.charAt(i);
+	        if (Character.isDigit(ch) || (ch == '-' && pageNumberStr.length() == 0)) {
+	            // Include digits and allow the negative sign only if it's the first character
+	            if (ch == '-') {
+	                isNegative = true;
+	            } else {
+	                pageNumberStr.append(ch);
+	            }
+	        } else if (pageNumberStr.length() > 0) {
+	            // If a digit or negative sign has been found previously, stop when a non-digit character is encountered
+	            break;
+	        }
+	    }
+
+	    // Convert the extracted string of digits to an integer
+	    int pageNumber = pageNumberStr.length() > 0 ? Integer.parseInt(pageNumberStr.toString()) : 0;
+
+	    // If a negative sign was found, make the page number negative
+	    if (isNegative) {
+	        pageNumber *= -1;
+	    }
+
+	    return pageNumber;
+	}
 	// following method creates one table only
 	// strClusteringKeyColumn is the name of the column that will be the primary
 	// key and the clustering column as well. The data type of that column will
@@ -48,7 +69,7 @@ public DBApp( ){
 				newTable.strClusteringKeyColumn = strClusteringKeyColumn;
 				createcsv.addtoCSV(newTable.strTableName,htblColNameType,strClusteringKeyColumn);
 				theTables.add(newTable);
-				
+				newTable.saveToFile(strTableName + ".ser");
 		//throw new DBAppException("not implemented yet");
 	}
 
@@ -66,49 +87,50 @@ public DBApp( ){
 	// htblColNameValue must include a value for the primary key
 	public void insertIntoTable(String strTableName, 
 								Hashtable<String,Object>  htblColNameValue) throws DBAppException{
-		
-		
-		Table targetTable = null;
-		//Table targetTable = null;
-        for (Table table : theTables) {
-            if (table.strTableName.equals(strTableName)) {
-                targetTable = table;
-                break;
-            }
-        }
-        if (targetTable == null) {
-            throw new DBAppException("Table not found: " + strTableName);
-       }			
-        //Table targetTable = Table.loadFromFile(strTableName + ".ser");
-        
-
+//		Table targetTable = null;
+//        for (Table table : theTables) {
+//            if (table.strTableName.equals(strTableName)) {
+//                targetTable = table;
+//                break;
+//            }
+//        }
 //        if (targetTable == null) {
 //            throw new DBAppException("Table not found: " + strTableName);
 //        }
+				
+        Table targetTable = Table.loadFromFile(strTableName + ".ser");
+        
+        if (targetTable == null) {
+            throw new DBAppException("Table not found: " + strTableName);
+        }
+        
+        
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Get the clustering key column
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-
-        // Get the value of the clustering key from the inserted data
         Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
-        // Find the correct page to insert the tuple
         Page targetPage = null;
-        for (Page page : targetTable.getPages()) {
-            Tuple firstTuple = page.getFirstTuple();
-            Tuple lastTuple = page.getLastTuple();
-            Object firstKey = firstTuple != null ? firstTuple.getValue(clusteringKeyColumn) : null;
-            Object lastKey = lastTuple != null ? lastTuple.getValue(clusteringKeyColumn) : null;
-            if ((firstKey == null || ((Comparable) clusteringKeyValue).compareTo(firstKey) >= 0) &&
-                (lastKey == null || ((Comparable) clusteringKeyValue).compareTo(lastKey) <= 0)) {
-                targetPage = page;
+        
+        int i = 0;
+        for (String page : targetTable.getPages()) {
+        	Page currPage = Page.loadFromFile(strTableName + i + ".ser");
+            Tuple lastTuple = currPage.getLastTuple();
+            Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
+            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0) 
+             {
+                targetPage = currPage;
                 break;
             }
+            i++;
         }
+        
         if (targetPage == null) {
-            // Create a new page if no suitable page is found
             targetPage = new Page();
-            targetTable.getPages().add(targetPage);
+            String lastPage = targetTable.getLastPage();
+            int  lastPageNumber = getPageNumber(lastPage);
+            targetPage.saveToFile(strTableName + (lastPageNumber+1) + ".ser");
+            targetTable.getPages().add(strTableName + (lastPageNumber+1));
+            targetPage = Page.loadFromFile(strTableName + (lastPageNumber+1) + ".ser");
         }
         
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,10 +169,15 @@ public DBApp( ){
             // If it's the last page, create a new page
             if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
                 Page newPage = new Page();
-                targetTable.getPages().add(newPage);
+                String lastPage = targetTable.getLastPage();
+                int lastPageNumber = getPageNumber(lastPage);
+                targetPage.saveToFile(strTableName + (lastPageNumber+1));
+                targetTable.getPages().add(strTableName + (lastPageNumber+1));
+                
             } else {
                 // Otherwise, shift a row down to the following page
-                Page nextPage = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
+                String nextPageString = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
+                Page nextPage = Page.loadFromFile(nextPageString);
                // nextPage.shiftRow(targetPage);
                 
                 Tuple shiftedTuple = targetPage.getLastTuple();
@@ -291,7 +318,9 @@ public DBApp( ){
 
 
 	public static void main( String[] args ){
-	
+		
+		//System.out.println(getPageNumber("Page-1.ser"));
+		
 	try{
 //		Hashtable htblColNameType = new Hashtable( );
 //		htblColNameType.put("id", "java.lang.Integer");
@@ -353,6 +382,7 @@ public DBApp( ){
 			dbApp.createTable( strTableName, "id", htblColNameType );
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
+			
 			Hashtable htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 1 ));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
@@ -360,20 +390,20 @@ public DBApp( ){
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //
 
-			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 1 ));
-			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-			htblColNameValue.put("gpa", new Double( 0.8 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			dbApp.updateTable(strTableName, "1", htblColNameValue);
-			htblColNameValue.clear( );
-
 //			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 5674567 ));
-//			htblColNameValue.put("name", new String("Dalia Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 1.25 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
+////			htblColNameValue.put("id", new Integer( 1 ));
+//			htblColNameValue.put("name", new String("Ahmed Noor" ) );
+//			htblColNameValue.put("gpa", new Double( 0.8 ) );
+////			dbApp.insertIntoTable( strTableName , htblColNameValue );
+//			dbApp.updateTable(strTableName, "1", htblColNameValue);
+//			htblColNameValue.clear( );
+
+			htblColNameValue.clear( );
+			htblColNameValue.put("id", new Integer( 5674567 ));
+			htblColNameValue.put("name", new String("Dalia Noor" ) );
+			htblColNameValue.put("gpa", new Double( 1.25 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+
 //			
 
 			
@@ -410,8 +440,9 @@ public DBApp( ){
             Table table = (Table) objectIn.readObject();
             objectIn.close();
 			
-			for (Page page : table.getPages()) {
-			    Vector<Tuple> tuples = page.getTuples();
+			for (String page : table.getPages()) {
+				Page currPage = Page.loadFromFile(page);
+			    Vector<Tuple> tuples = currPage.getTuples();
 			    System.out.println("Number of tuples in page: " + tuples.size());
 			    
 			    for (Tuple tuple : tuples) {
