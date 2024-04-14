@@ -32,7 +32,7 @@ public class Table implements Serializable{
 	public String getLastPage()
 	{
 		if (pages.isEmpty())
-			return "Page-1";
+			return "Page-1.ser";
 		else
 		return pages.lastElement();
 	}

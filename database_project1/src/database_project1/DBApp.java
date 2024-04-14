@@ -128,9 +128,10 @@ public DBApp( ){
             targetPage = new Page();
             String lastPage = targetTable.getLastPage();
             int  lastPageNumber = getPageNumber(lastPage);
-            targetPage.saveToFile(strTableName + (lastPageNumber+1) + ".ser");
-            targetTable.getPages().add(strTableName + (lastPageNumber+1));
-            targetPage = Page.loadFromFile(strTableName + (lastPageNumber+1) + ".ser");
+            int  incPageNumber = lastPageNumber + 1;
+            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+            targetPage = Page.loadFromFile(strTableName + (incPageNumber) + ".ser");
         }
         
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -164,15 +165,18 @@ public DBApp( ){
         // Replace the existing tuples with the temp vector
         targetPage.setTuples(temp);
         }
+        
+        
         // Check if the page is full, then handle shifting if needed
         if (targetPage.isFull()) {
             // If it's the last page, create a new page
             if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
-                Page newPage = new Page();
+            	targetPage = new Page();
                 String lastPage = targetTable.getLastPage();
-                int lastPageNumber = getPageNumber(lastPage);
-                targetPage.saveToFile(strTableName + (lastPageNumber+1));
-                targetTable.getPages().add(strTableName + (lastPageNumber+1));
+                int  lastPageNumber = getPageNumber(lastPage);
+                int  incPageNumber = lastPageNumber + 1;
+                targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+                targetTable.getPages().add(strTableName + (incPageNumber));
                 
             } else {
                 // Otherwise, shift a row down to the following page
@@ -398,11 +402,11 @@ public DBApp( ){
 //			dbApp.updateTable(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
 
-			htblColNameValue.clear( );
-			htblColNameValue.put("id", new Integer( 5674567 ));
-			htblColNameValue.put("name", new String("Dalia Noor" ) );
-			htblColNameValue.put("gpa", new Double( 1.25 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+//			htblColNameValue.clear( );
+//			htblColNameValue.put("id", new Integer( 5674567 ));
+//			htblColNameValue.put("name", new String("Dalia Noor" ) );
+//			htblColNameValue.put("gpa", new Double( 1.25 ) );
+//			dbApp.insertIntoTable( strTableName , htblColNameValue );
 
 //			
 
