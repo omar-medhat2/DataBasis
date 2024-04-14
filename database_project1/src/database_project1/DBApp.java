@@ -277,10 +277,119 @@ public DBApp( ){
 			}
 
 
-	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, 
-									String[]  strarrOperators) throws DBAppException{
-										
-		return null;
+	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+		   
+	    Vector<Tuple> resultSet = new Vector<>();
+
+	    
+	    for (int i = 0; i < arrSQLTerms.length; i++) {
+	        
+	        Vector<Tuple> termResult = new Vector<>();
+	        boolean tableFound = false;
+	        for (Table table : theTables) {
+	            if (table.getStrTableName().equals(arrSQLTerms[i]._strTableName)) {
+	                tableFound = true;
+	                
+	                for (Page page : table.getPages()) {
+	                    
+	                    for (Tuple tuple : page.getTuples()) {
+	                        
+	                        if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
+	                            termResult.add(tuple);
+	                        }
+	                    }
+	                }
+	                break; 
+	            }
+	        }
+	        
+	        if (!tableFound) 
+	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
+	        
+
+	        
+	        if (i == 0) {
+	            resultSet.addAll(termResult);
+	        } else {
+	            String operator = strarrOperators[i - 1];
+	            Vector<Tuple> result = new Vector<>();
+	            switch (operator) {
+	                case "AND":
+	            	    for (Tuple tuple : resultSet) 
+	            	        if (termResult.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	            	    break;
+	                case "OR":
+	                	result = new Vector<>(resultSet);
+	            	    for (Tuple tuple : termResult) 
+	            	        if (!result.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	                    break;
+	                case "XOR":
+	                	result = new Vector<>();
+	            	    for (Tuple tuple : resultSet) 
+	            	        if (!termResult.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    for (Tuple tuple : termResult) 
+	            	        if (!resultSet.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	                    break;
+	                default:
+	                    throw new IllegalArgumentException("Unsupported starroperator: " + operator);
+	            }
+	        }
+	    }
+
+	    return resultSet.iterator();
+	}
+
+
+	private boolean tupleMatchesCriteria(Tuple tuple, SQLTerm sqlTerm) throws DBAppException{
+	    
+	    Object tupleValue = tuple.getValue(sqlTerm._strColumnName);
+	    
+	    
+	    if (tupleValue instanceof String) {
+	        
+	        if (sqlTerm._strOperator.equals("=")) {
+	            return tupleValue.equals(sqlTerm._objValue);
+	        } else if (sqlTerm._strOperator.equals("!=")) {
+	            return !tupleValue.equals(sqlTerm._objValue);
+	        } else {
+	            
+	        	throw new DBAppException("Unsupported operator for strings: " + sqlTerm._strOperator);
+	        }
+	    } else if (tupleValue instanceof Number && sqlTerm._objValue instanceof Number) {
+	       
+	        double tupleDouble = ((Number) tupleValue).doubleValue();
+	        double queryDouble = ((Number) sqlTerm._objValue).doubleValue();
+	        switch (sqlTerm._strOperator) {
+	            case "=":
+	                return tupleDouble == queryDouble;
+	            case "!=":
+	                return tupleDouble != queryDouble;
+	            case ">":
+	                return tupleDouble > queryDouble;
+	            case ">=":
+	                return tupleDouble >= queryDouble;
+	            case "<":
+	                return tupleDouble < queryDouble;
+	            case "<=":
+	                return tupleDouble <= queryDouble;
+	            default:
+	                
+	            	throw new DBAppException("Unsupported operator: " + sqlTerm._strOperator);
+	        }
+	    } else 
+	        throw new DBAppException("Invalid Comparison: " + tupleValue.getClass().getName());
+	    
 	}
 
 
