@@ -35,7 +35,7 @@ public class Table implements Serializable{
 			return "Page-1.ser";
 		else
 		return pages.lastElement();
-	}
+				}
 	
 	public Page retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
 	    int comparisonResult = 1;

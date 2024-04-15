@@ -111,9 +111,9 @@ public DBApp( ){
 
         Page targetPage = null;
         
-        int i = 0;
+      
         for (String page : targetTable.getPages()) {
-        	Page currPage = Page.loadFromFile(strTableName + i + ".ser");
+        	Page currPage = Page.loadFromFile(page);
             Tuple lastTuple = currPage.getLastTuple();
             Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
             if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0) 
@@ -121,9 +121,8 @@ public DBApp( ){
                 targetPage = currPage;
                 break;
             }
-            i++;
         }
-        
+        // imp --Problem
         if (targetPage == null) {
             targetPage = new Page();
             String lastPage = targetTable.getLastPage();
@@ -131,44 +130,40 @@ public DBApp( ){
             int  incPageNumber = lastPageNumber + 1;
             targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
             targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-            targetPage = Page.loadFromFile(strTableName + (incPageNumber) + ".ser");
+//            targetPage = Page.loadFromFile(strTableName + (incPageNumber) + ".ser");
         }
         
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // Insert the tuple into the page
+        
         if (!targetPage.isFull())
         {
         Vector<Tuple> temp = new Vector<>();
         boolean inserted = false;
-        // Iterate through existing tuples to find the correct position to insert the new tuple
+      
         for (Tuple tuple : targetPage.getTuples()) {
-            // Compare primary key values
+          
             Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
             if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-                // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
                 temp.add(new Tuple(htblColNameValue));
-                inserted = true; // Flag to indicate that the new tuple has been inserted
+                inserted = true; 
             }
-            // Insert the current tuple into the temp vector
+            
             temp.add(tuple);
         }
-
-        // If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
         if (!inserted) {
             temp.add(new Tuple(htblColNameValue));
         }
-
-        // If the temp vector is still empty, it means the new tuple should be inserted at the end
-        if (temp.isEmpty()) {
-            temp.add(new Tuple(htblColNameValue));
-        }
-        // Replace the existing tuples with the temp vector
+//        if (temp.isEmpty()) {
+//            temp.add(new Tuple(htblColNameValue));
+//        }
+//        for(Tuple tuple : temp)
+//        {
+//        	targetPage.insertTuple(tuple);
+//        }
+        
         targetPage.setTuples(temp);
         }
-        
-        
-        // Check if the page is full, then handle shifting if needed
-        if (targetPage.isFull()) {
+        else {
             // If it's the last page, create a new page
             if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
             	targetPage = new Page();
@@ -176,7 +171,7 @@ public DBApp( ){
                 int  lastPageNumber = getPageNumber(lastPage);
                 int  incPageNumber = lastPageNumber + 1;
                 targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-                targetTable.getPages().add(strTableName + (incPageNumber));
+                targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
                 
             } else {
                 // Otherwise, shift a row down to the following page
@@ -209,9 +204,9 @@ public DBApp( ){
                 }
 
                 // If the temp vector is still empty, it means the new tuple should be inserted at the end
-                if (temp.isEmpty()) {
-                    temp.add(new Tuple(htblColNameValue));
-                }
+//                if (temp.isEmpty()) {
+//                    temp.add(new Tuple(htblColNameValue));
+//                }
                 // Replace the existing tuples with the temp vector
                 targetPage.setTuples(temp);
                 
@@ -226,10 +221,8 @@ public DBApp( ){
             }
             
         }
-
-        // Save the table back to disk
+        targetPage.saveToFile("Student0.ser");
         targetTable.saveToFile(strTableName + ".ser");
-//		throw new DBAppException("not implemented yet");
 	}
 	
 
