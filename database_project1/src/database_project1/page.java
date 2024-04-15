@@ -23,6 +23,14 @@ class Tuple implements Serializable {
     public void addTuple(String attribute, Object value) {
         tuples.put(attribute, value);
     }
+    public void updateTuple(String attribute, Object newValue) {
+        if (tuples.containsKey(attribute)) {
+            tuples.put(attribute, newValue);
+        } else {
+            System.out.println("Attribute '" + attribute + "' does not exist in the tuple.");
+        }
+    }
+
 
     public Object getValue(String attribute) {
         return tuples.get(attribute);

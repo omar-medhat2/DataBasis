@@ -224,8 +224,6 @@ public DBApp( ){
         targetPage.saveToFile("Student0.ser");
         targetTable.saveToFile(strTableName + ".ser");
 	}
-	
-
 
 	// following method updates one row only
 	// htblColNameValue holds the key and new value 
@@ -239,7 +237,7 @@ public DBApp( ){
             throw new DBAppException("Table not found: " + strTableName);
         }
         
-	    Page targetPage = null;
+        List<Page> targetPage = null;
 		try {
 			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
 		} catch (ClassNotFoundException e) {
@@ -255,12 +253,17 @@ public DBApp( ){
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
 	    // Find the tuple to update
 	    Tuple targetTuple = null;
-	    for (Tuple tuple : targetPage.getTuples()) {
-	    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-	        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
-	            targetTuple = tuple;
-	            break;
-	        }
+	    int pageIndex = 0;
+	    for(int i = 0;i<targetPage.size();i++) {
+		    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
+//		    	System.out.println(tuple);
+		    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
+		        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
+		        	pageIndex = i;
+		            targetTuple = tuple;
+		            break;
+		        }
+		    }
 	    }
 	    if (targetTuple == null) {
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
@@ -270,19 +273,15 @@ public DBApp( ){
 	    for (String columnName : htblColNameValue.keySet()) {
 	        if (!columnName.equals(targetTable.getStrClusteringKeyColumn())) { // Skip clustering key column
 	        	Object newValue;
-	        	if (columnName.equals(targetTable.getStrClusteringKeyColumn())) {
-	        	    // Handle clustering key value differently if needed
-	        	    newValue = htblColNameValue.get(columnName);
-	        	} else {
-	        	    // Handle other columns
-	        	    newValue = htblColNameValue.get(columnName);
-	        	}
-
-	            targetTuple.addTuple(columnName, newValue);
+	        	newValue = htblColNameValue.get(columnName);
+	            targetTuple.updateTuple(columnName, newValue);
 	        }
 	    }
+//		    for (Tuple tuple : ((Page)targetPage.get(pageIndex)).getTuples()) {
+//		    	System.out.println(tuple);
+//		    }
 	    // Save the updated page back to disk
-	    targetPage.saveToFile("Student0.ser");
+	    (targetPage.get(pageIndex)).saveToFile("Student1.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
 
 //		throw new DBAppException("not implemented yet");
@@ -380,13 +379,20 @@ public DBApp( ){
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //
-
+//			htblColNameValue.clear( );
+//			htblColNameValue.put("id", new Integer( 2 ));
+//			htblColNameValue.put("name", new String("moahmed" ) );
+//			htblColNameValue.put("gpa", new Double( 2.67 ) );
+//			dbApp.insertIntoTable2( strTableName , htblColNameValue );
+			
+			
 			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 1 ));
 			htblColNameValue.put("name", new String("Ahmed Noorrr" ) );
 			htblColNameValue.put("gpa", new Double( 0.8 ) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			dbApp.updateTable(strTableName, "1", htblColNameValue);
+//			dbApp.updateTable2(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
 
 //			htblColNameValue.clear( );
