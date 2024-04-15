@@ -234,13 +234,7 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-		Table targetTable = null;
-        for (Table table : theTables) {
-            if (table.strTableName.equals(strTableName)) {
-                targetTable = table;
-                break;
-            }
-        }
+		Table targetTable = Table.loadFromFile(strTableName + ".ser");
         if (targetTable == null) {
             throw new DBAppException("Table not found: " + strTableName);
         }
@@ -255,20 +249,19 @@ public DBApp( ){
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-	    
 	    if (targetPage == null) {
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
-	    
+	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
 	    // Find the tuple to update
 	    Tuple targetTuple = null;
 	    for (Tuple tuple : targetPage.getTuples()) {
-	        if (strClusteringKeyValue.equals(tuple.getClusteringKeyValue())) {
+	    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
 	            targetTuple = tuple;
 	            break;
 	        }
 	    }
-	    
 	    if (targetTuple == null) {
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
@@ -288,9 +281,10 @@ public DBApp( ){
 	            targetTuple.addTuple(columnName, newValue);
 	        }
 	    }
-	    
 	    // Save the updated page back to disk
+	    targetPage.saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
+
 //		throw new DBAppException("not implemented yet");
 //		throw new DBAppException("not implemented yet");
 	}
@@ -387,12 +381,12 @@ public DBApp( ){
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //
 
-//			htblColNameValue.clear( );
-////			htblColNameValue.put("id", new Integer( 1 ));
-//			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 0.8 ) );
-////			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//			dbApp.updateTable(strTableName, "1", htblColNameValue);
+			htblColNameValue.clear( );
+//			htblColNameValue.put("id", new Integer( 1 ));
+			htblColNameValue.put("name", new String("Ahmed Noorrr" ) );
+			htblColNameValue.put("gpa", new Double( 0.8 ) );
+//			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.updateTable(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
 
 //			htblColNameValue.clear( );

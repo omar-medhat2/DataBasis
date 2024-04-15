@@ -46,19 +46,19 @@ public class Table implements Serializable{
 
 	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
 	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
-	            currentPage = Page.loadFromFile(strTableName + "_" + pageIndex);
+	            currentPage = Page.loadFromFile(strTableName + pageIndex + ".ser");
 //	            comparisonResult = Double.compare(Double.parseDouble((String) clusteringKeyValue), (Double) currentPage.max);
 	        }
 	    } 
 	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
 	        for (int pageIndex = 0; pageIndex < pages.size() - 1 && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
-	            currentPage = Page.loadFromFile(strTableName + "_" + pageIndex);
+	            currentPage = Page.loadFromFile(strTableName + pageIndex + ".ser");
 //	            comparisonResult = ((String) clusteringKeyValue).compareTo((String) currentPage.max);
 	        }
 	    } 
 	    else {
 	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
-	            currentPage = Page.loadFromFile(strTableName + "_" + pageIndex);
+	            currentPage = Page.loadFromFile(strTableName + pageIndex + ".ser");
 //	            comparisonResult = Integer.compare(Integer.parseInt((String) clusteringKeyValue), (Integer) currentPage.max);
 	        }
 	    }
