@@ -276,9 +276,9 @@ targetTable.saveToFile(strTableName + ".ser");
 	            targetTuple.updateTuple(columnName, newValue);
 	        }
 	    }
-//		    for (Tuple tuple : ((Page)targetPage.get(pageIndex)).getTuples()) {
-//		    	System.out.println(tuple);
-//		    }
+		    for (Tuple tuple : ((Page)targetPage.get(pageIndex)).getTuples()) {
+		    	System.out.println(tuple);
+		    }
 	    // Save the updated page back to disk
 	    (targetPage.get(pageIndex)).saveToFile("Student1.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
@@ -377,12 +377,12 @@ targetTable.saveToFile(strTableName + ".ser");
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
-//			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 2 ));
-//			htblColNameValue.put("name", new String("moahmed" ) );
-//			htblColNameValue.put("gpa", new Double( 2.67 ) );
-//			dbApp.insertIntoTable2( strTableName , htblColNameValue );
+
+			htblColNameValue.clear( );
+			htblColNameValue.put("id", new Integer( 2 ));
+			htblColNameValue.put("name", new String("moahmed" ) );
+			htblColNameValue.put("gpa", new Double( 2.67 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
 			
 			htblColNameValue.clear( );
@@ -390,8 +390,8 @@ targetTable.saveToFile(strTableName + ".ser");
 			htblColNameValue.put("name", new String("Ahmed Noorrr" ) );
 			htblColNameValue.put("gpa", new Double( 0.8 ) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.updateTable(strTableName, "2", htblColNameValue);
 			dbApp.updateTable(strTableName, "1", htblColNameValue);
-//			dbApp.updateTable2(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
 
 //			htblColNameValue.clear( );
