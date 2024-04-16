@@ -85,144 +85,119 @@ public DBApp( ){
 
 	// following method inserts one row only. 
 	// htblColNameValue must include a value for the primary key
-	public void insertIntoTable(String strTableName, 
-			Hashtable<String,Object>  htblColNameValue) throws DBAppException{
-//Table targetTable = null;
-//for (Table table : theTables) {
-//if (table.strTableName.equals(strTableName)) {
-//targetTable = table;
-//break;
-//}
-//}
-//if (targetTable == null) {
-//throw new DBAppException("Table not found: " + strTableName);
-//}
+	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
+	    // Load the target table from file
+	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 
-Table targetTable = Table.loadFromFile(strTableName + ".ser");
+	    // Check if the target table exists
+	    if (targetTable == null) {
+	        throw new DBAppException("Table not found: " + strTableName);
+	    }
 
-if (targetTable == null) {
-throw new DBAppException("Table not found: " + strTableName);
-}
+	    // Get the clustering key column and value
+	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
+	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
+	    // Initialize variables
+	    Page targetPage = null;
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////
-String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+	    // Iterate over pages in the table
+	    for (String page : targetTable.getPages()) {
+	        Page currPage = Page.loadFromFile(page);
+	        Tuple lastTuple = currPage.getLastTuple();
+	        Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
+	        if (!currPage.isFull()) {
+	            targetPage = currPage;
+	            break;
+	        }
+	    }
 
-Page targetPage = null;
+	    // If no suitable page is found, create a new page
+	    if (targetPage == null) {
+	        targetPage = new Page();
+	        String lastPage = targetTable.getLastPage();
+	        int lastPageNumber = getPageNumber(lastPage);
+	        int incPageNumber = lastPageNumber + 1;
+	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+	    }
 
+	    // Check if the target page is full
+	    if (!targetPage.isFull()) {
+	        Vector<Tuple> temp = new Vector<>();
+	        boolean inserted = false;
 
-for (String page : targetTable.getPages()) {
-Page currPage = Page.loadFromFile(page);
-Tuple lastTuple = currPage.getLastTuple();
-Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
-if (!currPage.isFull()) 
-{
-targetPage = currPage;
-break;
-}
-}
-// imp --Problem
-if (targetPage == null) {
-targetPage = new Page();
-String lastPage = targetTable.getLastPage();
-int  lastPageNumber = getPageNumber(lastPage);
-int  incPageNumber = lastPageNumber + 1;
-targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-//targetPage = Page.loadFromFile(strTableName + (incPageNumber) + ".ser");
-}
+	        // Iterate over tuples in the target page
+	        for (Tuple tuple : targetPage.getTuples()) {
+	            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	            // Compare primary key values to find the correct position to insert the new tuple
+	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                temp.add(new Tuple(htblColNameValue));
+	                inserted = true;
+	            }
+	            temp.add(tuple);
+	        }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
+	        // If the new tuple hasn't been inserted yet, add it to the end
+	        if (!inserted) {
+	            temp.add(new Tuple(htblColNameValue));
+	        }
 
-if (!targetPage.isFull())
-{
-Vector<Tuple> temp = new Vector<>();
-boolean inserted = false;
+	        // Update the target page with the new tuples
+	        targetPage.setTuples(temp);
+	    } else {
+	        // If the target page is full
+	        if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
+	            // If it's the last page, create a new page
+	            targetPage = new Page();
+	            String lastPage = targetTable.getLastPage();
+	            int lastPageNumber = getPageNumber(lastPage);
+	            int incPageNumber = lastPageNumber + 1;
+	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+	        } else {
+	            // Otherwise, shift a row down to the following page
+	            String nextPageString = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
+	            Page nextPage = Page.loadFromFile(nextPageString);
+	            Tuple shiftedTuple = targetPage.getLastTuple();
+	            targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
+	            Vector<Tuple> temp = new Vector<>();
+	            boolean inserted = false;
 
-for (Tuple tuple : targetPage.getTuples()) {
+	            // Iterate through existing tuples to find the correct position to insert the new tuple
+	            for (Tuple tuple : targetPage.getTuples()) {
+	                // Compare primary key values
+	                Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	                if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                    temp.add(new Tuple(htblColNameValue));
+	                    inserted = true;
+	                }
+	                temp.add(tuple);
+	            }
 
-Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-temp.add(new Tuple(htblColNameValue));
-inserted = true; 
-}
+	            // If the new tuple hasn't been inserted yet, add it to the end
+	            if (!inserted) {
+	                temp.add(new Tuple(htblColNameValue));
+	            }
 
-temp.add(tuple);
-}
-if (!inserted) {
-temp.add(new Tuple(htblColNameValue));
-}
-if (temp.isEmpty()) {
-temp.add(new Tuple(htblColNameValue));
-}
+	            // Update the target page with the new tuples
+	            targetPage.setTuples(temp);
 
+	            Vector<Tuple> tmp = new Vector<>();
+	            tmp.add(shiftedTuple);
+	            for (Tuple tuple : nextPage.getTuples()) {
+	                if (!tuple.equals(shiftedTuple)) {
+	                    tmp.add(tuple);
+	                }
+	            }
+	            nextPage.setTuples(tmp);
+	        }
+	    }
 
-
-targetPage.setTuples(temp);
-
-}
-else {
-// If it's the last page, create a new page
-if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
-targetPage = new Page();
-String lastPage = targetTable.getLastPage();
-int  lastPageNumber = getPageNumber(lastPage);
-int  incPageNumber = lastPageNumber + 1;
-targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-
-} else {
-// Otherwise, shift a row down to the following page
-String nextPageString = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
-Page nextPage = Page.loadFromFile(nextPageString);
-// nextPage.shiftRow(targetPage);
-
-Tuple shiftedTuple = targetPage.getLastTuple();
-targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
-
-
-Vector<Tuple> temp = new Vector<>();
-boolean inserted = false;
-// Iterate through existing tuples to find the correct position to insert the new tuple
-for (Tuple tuple : targetPage.getTuples()) {
-// Compare primary key values
-Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-    // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
-    temp.add(new Tuple(htblColNameValue));
-    inserted = true; // Flag to indicate that the new tuple has been inserted
-}
-// Insert the current tuple into the temp vector
-temp.add(tuple);
-}
-
-// If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
-if (!inserted) {
-temp.add(new Tuple(htblColNameValue));
-}
-
-// If the temp vector is still empty, it means the new tuple should be inserted at the end
-//if (temp.isEmpty()) {
-//temp.add(new Tuple(htblColNameValue));
-//}
-// Replace the existing tuples with the temp vector
-targetPage.setTuples(temp);
-
-Vector<Tuple> tmp = new Vector<>();
-tmp.add(shiftedTuple); 
-for (Tuple tuple : nextPage.getTuples()) {
-if (!tuple.equals(shiftedTuple)) {
-    tmp.add(tuple); 
-}
-}
-nextPage.setTuples(tmp);
-}
-
-}
-targetPage.saveToFile("Student0.ser");
-targetTable.saveToFile(strTableName + ".ser");
-}
+	    // Save changes to files
+	    targetPage.saveToFile("Student0.ser");
+	    targetTable.saveToFile(strTableName + ".ser");
+	}
 
 	// following method updates one row only
 	// htblColNameValue holds the key and new value 
