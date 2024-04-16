@@ -268,19 +268,7 @@ targetTable.saveToFile(strTableName + ".ser");
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
 	    
-	    // Update the tuple with new values
-	    for (String columnName : htblColNameValue.keySet()) {
-	        if (!columnName.equals(targetTable.getStrClusteringKeyColumn())) { // Skip clustering key column
-	        	Object newValue;
-	        	newValue = htblColNameValue.get(columnName);
-	            targetTuple.updateTuple(columnName, newValue);
-	        }
-	    }
-		    for (Tuple tuple : ((Page)targetPage.get(pageIndex)).getTuples()) {
-		    	System.out.println(tuple);
-		    }
-	    // Save the updated page back to disk
-	    (targetPage.get(pageIndex)).saveToFile("Student1.ser");
+	    (targetPage.get(pageIndex)).saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
 
 //		throw new DBAppException("not implemented yet");
