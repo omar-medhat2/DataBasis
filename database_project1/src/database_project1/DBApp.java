@@ -13,7 +13,7 @@ import java.util.Vector;
 import java.io.File;
 
 public class DBApp {
-	public static  ArrayList<Table> theTables = new ArrayList<>();
+	
 public DBApp( ){
 		
 	}
@@ -61,18 +61,25 @@ public DBApp( ){
 	// be passed in htblColNameType
 	// htblColNameValue will have the column name as key and the data 
 	// type as value
+	
+
 	public static void createTable(String strTableName, 
-							String strClusteringKeyColumn,  
-							Hashtable<String,String> htblColNameType) throws DBAppException{
-								
-				Table newTable = new Table();
-				newTable.strTableName = strTableName;
-				newTable.strClusteringKeyColumn = strClusteringKeyColumn;
-				createcsv.addtoCSV(newTable.strTableName,htblColNameType,strClusteringKeyColumn);
-				theTables.add(newTable);
-				newTable.saveToFile(strTableName + ".ser");
-		//throw new DBAppException("not implemented yet");
+	                                String strClusteringKeyColumn,  
+	                                Hashtable<String,String> htblColNameType) throws DBAppException {
+	    // Check if the table file already exists
+	    File tableFile = new File(strTableName + ".ser");
+	    if (tableFile.exists()) {
+	        throw new DBAppException("Table already exists: " + strTableName);
+	    }
+
+	    // Create a new table
+	    Table newTable = new Table();
+	    newTable.strTableName = strTableName;
+	    newTable.strClusteringKeyColumn = strClusteringKeyColumn;
+	    createcsv.addtoCSV(newTable.strTableName, htblColNameType, strClusteringKeyColumn);
+	    newTable.saveToFile(strTableName + ".ser");
 	}
+
 
 
 	// following method creates a B+tree index 
@@ -530,29 +537,19 @@ public DBApp( ){
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
-
-//////		
-			htblColNameValue.clear( );
-			htblColNameValue.put("id", new Integer( 500000 ));
-			htblColNameValue.put("name", new String("Ahmed Noor" ) );
-			htblColNameValue.put("gpa", new Double( 0.8 ) );
-////			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			dbApp.updateTable(strTableName, "2343432", htblColNameValue);
-
 			//dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
+
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 2343433));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
-			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 2343434));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
