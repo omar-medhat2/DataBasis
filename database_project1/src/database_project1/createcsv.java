@@ -61,7 +61,7 @@ public class createcsv {
         List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
         for (String line : lines) {
             String[] fields = line.split(",");
-            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[3].equals("TRUE")) {
+            if (fields.length >= 3 && fields[0].equals(strTableName) && (fields[3].equals("TRUE")) || (fields[3].equals("true"))){
                 return fields[1];
             }
         }

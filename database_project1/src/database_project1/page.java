@@ -64,17 +64,10 @@ class Tuple implements Serializable {
         }
         return stringBuilder.toString();
     }
+    
 }
 
-	
-	
-	
 
-    
-    
-    
-	
-	
 
 
 class Page implements Serializable {
