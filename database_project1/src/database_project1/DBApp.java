@@ -85,6 +85,7 @@ public DBApp( ){
 
 	// following method inserts one row only. 
 	// htblColNameValue must include a value for the primary key
+
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
 	    // Load the target table from file
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
@@ -197,6 +198,7 @@ public DBApp( ){
 	    // Save changes to files
 	    targetPage.saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
+
 	}
 
 	// following method updates one row only
@@ -206,6 +208,7 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
+
 		Table targetTable = Table.loadFromFile(strTableName + ".ser");
         if (targetTable == null) {
             throw new DBAppException("Table not found: " + strTableName);
@@ -254,21 +257,176 @@ public DBApp( ){
 	// following method could be used to delete one or more rows.
 	// htblColNameValue holds the key and value. This will be used in search 
 	// to identify which rows/tuples to delete. 	
-	// htblColNameValue enteries are ANDED together
-	public void deleteFromTable(String strTableName, 
+	// htblColNameValue entries are ANDED together
+	public static void deleteFromTable(String strTableName, 
 								Hashtable<String,Object> htblColNameValue) throws DBAppException{
 	
-		throw new DBAppException("not implemented yet");
+		
+		Table targetTable = null;
+		for (Table table : theTables) {
+		    if (table.getStrTableName().equals(strTableName)) {
+		        targetTable = table;
+		        break;
+		    }
+		}
+
+		if (targetTable == null) {
+		    throw new DBAppException("Table not found: " + strTableName);
+		}
+		
+		// Iterate over pages in the table
+		for (Page page : targetTable.getPages()) {
+		    // Iterate over tuples in the page
+		    Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+		    while (tupleIterator.hasNext()) {
+		        Tuple tuple = tupleIterator.next();
+		        
+		        // Check if the tuple matches all conditions in the hashtable
+		        boolean allConditions = true;
+		        for (String attributeName : htblColNameValue.keySet()) {
+		            Object attributeValue = htblColNameValue.get(attributeName);
+		            if (!tuple.getValue(attributeName).equals(attributeValue)) {
+		                allConditions = false;
+		                break;
+		            }
+		        }
+		        
+		        // If the tuple matches all conditions, remove it from the tuple vector
+		        if (allConditions) {
+		            tupleIterator.remove();
+		            // Check if the page is empty after removing the tuple
+		            if (page.getTuples().isEmpty()) {
+		                // Remove the empty page from the table
+		                targetTable.getPages().remove(page);
+		            }
+		        }
+		    }
+		}
+	    
+	    
+
+	    // Save the updated page(s) back to disk
+	    for (Page page : targetTable.getPages()) {
+	        page.saveToFile(strTableName + ".ser");
+	    }
 	}
 
 
-	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, 
-									String[]  strarrOperators) throws DBAppException{
-										
-		return null;
+	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+	   
+	    Vector<Tuple> resultSet = new Vector<>();
+
+	    
+	    for (int i = 0; i < arrSQLTerms.length; i++) {
+	        
+	        Vector<Tuple> termResult = new Vector<>();
+	        boolean tableFound = false;
+	        for (Table table : theTables) {
+	            if (table.getStrTableName().equals(arrSQLTerms[i]._strTableName)) {
+	                tableFound = true;
+	                
+	                for (Page page : table.getPages()) {
+	                    
+	                    for (Tuple tuple : page.getTuples()) {
+	                        
+	                        if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
+	                            termResult.add(tuple);
+	                        }
+	                    }
+	                }
+	                break; 
+	            }
+	        }
+	        
+	        if (!tableFound) 
+	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
+	        
+
+	        
+	        if (i == 0) {
+	            resultSet.addAll(termResult);
+	        } else {
+	            String operator = strarrOperators[i - 1];
+	            Vector<Tuple> result = new Vector<>();
+	            switch (operator) {
+	                case "AND":
+	            	    for (Tuple tuple : resultSet) 
+	            	        if (termResult.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	            	    break;
+	                case "OR":
+	                	result = new Vector<>(resultSet);
+	            	    for (Tuple tuple : termResult) 
+	            	        if (!result.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	                    break;
+	                case "XOR":
+	                	result = new Vector<>();
+	            	    for (Tuple tuple : resultSet) 
+	            	        if (!termResult.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    for (Tuple tuple : termResult) 
+	            	        if (!resultSet.contains(tuple)) 
+	            	            result.add(tuple);
+	            	    
+	            	    resultSet = result;
+	                    break;
+	                default:
+	                    throw new IllegalArgumentException("Unsupported starroperator: " + operator);
+	            }
+	        }
+	    }
+
+	    return resultSet.iterator();
 	}
 
 
+	private boolean tupleMatchesCriteria(Tuple tuple, SQLTerm sqlTerm) throws DBAppException{
+	    
+	    Object tupleValue = tuple.getValue(sqlTerm._strColumnName);
+	    
+	    
+	    if (tupleValue instanceof String) {
+	        
+	        if (sqlTerm._strOperator.equals("=")) {
+	            return tupleValue.equals(sqlTerm._objValue);
+	        } else if (sqlTerm._strOperator.equals("!=")) {
+	            return !tupleValue.equals(sqlTerm._objValue);
+	        } else {
+	            
+	        	throw new DBAppException("Unsupported operator for strings: " + sqlTerm._strOperator);
+	        }
+	    } else if (tupleValue instanceof Number && sqlTerm._objValue instanceof Number) {
+	       
+	        double tupleDouble = ((Number) tupleValue).doubleValue();
+	        double queryDouble = ((Number) sqlTerm._objValue).doubleValue();
+	        switch (sqlTerm._strOperator) {
+	            case "=":
+	                return tupleDouble == queryDouble;
+	            case "!=":
+	                return tupleDouble != queryDouble;
+	            case ">":
+	                return tupleDouble > queryDouble;
+	            case ">=":
+	                return tupleDouble >= queryDouble;
+	            case "<":
+	                return tupleDouble < queryDouble;
+	            case "<=":
+	                return tupleDouble <= queryDouble;
+	            default:
+	                
+	            	throw new DBAppException("Unsupported operator: " + sqlTerm._strOperator);
+	        }
+	    } else 
+	        throw new DBAppException("Invalid Comparison: " + tupleValue.getClass().getName());
+	    
+	}
+	
 	public static void main( String[] args ){
 		
 		//System.out.println(getPageNumber("Page-1.ser"));
@@ -326,20 +484,70 @@ public DBApp( ){
 //		
 		String strTableName = "Student";
 		DBApp	dbApp = new DBApp( );
-////			
+////		
+		/*
 			Hashtable htblColNameType = new Hashtable( );
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
 			dbApp.createTable( strTableName, "id", htblColNameType );
+
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
 			
 			Hashtable htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 1 ));
+
+			
+//
+			Hashtable htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343432));
+
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			Tuple x = new Tuple(htblColNameValue,"id");
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343433));
+			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			Tuple y = new Tuple(htblColNameValue,"id");
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343434));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			Tuple z = new Tuple(htblColNameValue,"id");
+			
+			Page Page1 = new Page("id");
+			
+			////testing select
+			
+			SQLTerm[] arrSQLTerms = new SQLTerm[2];
+			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+			arrSQLTerms[0]._strTableName = "Student";
+			arrSQLTerms[0]._strColumnName= "name";
+			arrSQLTerms[0]._strOperator = "!=";
+			arrSQLTerms[0]._objValue = "Ahmed Noor";
+
+			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+			arrSQLTerms[1]._strTableName = "Student";
+			arrSQLTerms[1]._strColumnName= "gpa";
+			arrSQLTerms[1]._strOperator = "=";
+			arrSQLTerms[1]._objValue = new Double(0.95);
+
+			String[] strarrOperators = new String[1];
+			strarrOperators[0] = "AND";
+			// select * from Student where name = “John Noor” or gpa = 1.5;
+			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+			System.out.println("Result Set:");
+			while (resultSet.hasNext()) {
+			    Tuple tuple = (Tuple) resultSet.next();
+			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
+			}
+			
+			
+
 
 			htblColNameValue.clear( );
 			htblColNameValue.put("id", new Integer( 2 ));
@@ -356,6 +564,7 @@ public DBApp( ){
 			dbApp.updateTable(strTableName, "2", htblColNameValue);
 			dbApp.updateTable(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
+				*/
 
 //			htblColNameValue.clear( );
 //			htblColNameValue.put("id", new Integer( 5674567 ));
