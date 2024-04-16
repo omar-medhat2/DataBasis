@@ -8,15 +8,17 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Vector;
 
 public class Table implements Serializable{
 	String strTableName;
 	String strClusteringKeyColumn;
 	Hashtable<String,String> htblColNameType;
-	Vector<Page> pages;
+	public Vector<String> pages;
 	
 	public Table()
 	{
@@ -29,22 +31,43 @@ public class Table implements Serializable{
         this.pages = new Vector<>();
     }
 	
-	 public boolean contains(Object key) {
-	        for (Page page : pages) {
-	           
-	                // Check if the key is within the range of clustering keys for the tuples in the page
-	                Tuple firstTuple = page.getFirstTuple();
-	                Tuple lastTuple = page.getLastTuple();
-	                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
-	                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
-	                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
-	                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
-	                    return true;
-	                }
-	            }
-	        
-	        return false;
+	public String getLastPage()
+	{
+		if (pages.isEmpty())
+			return "Page-1.ser";
+		else
+		return pages.lastElement();
+				}
+	
+	public List<Page> retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
+	    int comparisonResult = 1;
+	    List<Page> currentPage = new ArrayList<Page>();
+
+	    String keyColumnName = createcsv.getCluster(strTableName);
+	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
+
+	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
+	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
+	            currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
+//	            comparisonResult = Double.compare(Double.parseDouble((String) clusteringKeyValue), (Double) currentPage.max);
+	        }
+	    } 
+	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
+	        for (int pageIndex = 0; pageIndex < pages.size() - 1 && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
+	        	currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
+//	            comparisonResult = ((String) clusteringKeyValue).compareTo((String) currentPage.max);
+	        }
+	    } 
+	    else {
+	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
+	        	currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
+//	            comparisonResult = Integer.compare(Integer.parseInt((String) clusteringKeyValue), (Integer) currentPage.max);
+	        }
 	    }
+	    
+	    return currentPage;
+	}
+
 	
 	public String getStrClusteringKeyColumn() {
 		return strClusteringKeyColumn;
@@ -60,7 +83,7 @@ public class Table implements Serializable{
 	}
 
 
-	public Vector<Page> getPages() {
+	public Vector<String> getPages() {
 		return pages;
 	}
 

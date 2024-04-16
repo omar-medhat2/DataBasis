@@ -1,6 +1,7 @@
 package database_project1;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.util.ArrayList;
@@ -9,6 +10,7 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
+import java.io.File;
 
 public class DBApp {
 	public static  ArrayList<Table> theTables = new ArrayList<>();
@@ -24,14 +26,35 @@ public DBApp( ){
 		
 	}
 
-	public static int CurrentPageNumber(String PageName) {
-        int pageNumber = 0;
-            String[] parts = PageName.split("\\.");
-            String[] nameParts = parts[0].split("page");
-            pageNumber = Integer.parseInt(nameParts[1]);
-       
-        return pageNumber;
-    }
+	public int getPageNumber(String pageName) {
+	    StringBuilder pageNumberStr = new StringBuilder();
+	    boolean isNegative = false;
+
+	    for (int i = 0; i < pageName.length(); i++) {
+	        char ch = pageName.charAt(i);
+	        if (Character.isDigit(ch) || (ch == '-' && pageNumberStr.length() == 0)) {
+	            // Include digits and allow the negative sign only if it's the first character
+	            if (ch == '-') {
+	                isNegative = true;
+	            } else {
+	                pageNumberStr.append(ch);
+	            }
+	        } else if (pageNumberStr.length() > 0) {
+	            // If a digit or negative sign has been found previously, stop when a non-digit character is encountered
+	            break;
+	        }
+	    }
+
+	    // Convert the extracted string of digits to an integer
+	    int pageNumber = pageNumberStr.length() > 0 ? Integer.parseInt(pageNumberStr.toString()) : 0;
+
+	    // If a negative sign was found, make the page number negative
+	    if (isNegative) {
+	        pageNumber *= -1;
+	    }
+
+	    return pageNumber;
+	}
 	// following method creates one table only
 	// strClusteringKeyColumn is the name of the column that will be the primary
 	// key and the clustering column as well. The data type of that column will
@@ -47,7 +70,7 @@ public DBApp( ){
 				newTable.strClusteringKeyColumn = strClusteringKeyColumn;
 				createcsv.addtoCSV(newTable.strTableName,htblColNameType,strClusteringKeyColumn);
 				theTables.add(newTable);
-				
+				newTable.saveToFile(strTableName + ".ser");
 		//throw new DBAppException("not implemented yet");
 	}
 
@@ -63,91 +86,130 @@ public DBApp( ){
 
 	// following method inserts one row only. 
 	// htblColNameValue must include a value for the primary key
-	public void insertIntoTable(String strTableName, 
-								Hashtable<String,Object>  htblColNameValue) throws DBAppException{
-		Table targetTable = null;
-        for (Table table : theTables) {
-            if (table.strTableName.equals(strTableName)) {
-                targetTable = table;
-                break;
-            }
-        }
-        if (targetTable == null) {
-            throw new DBAppException("Table not found: " + strTableName);
-        }
 
-        // Get the clustering key column
-        String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
+	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
+	    // Get the clustering key column from metadata
+	    String clusteringKeyColumn = createcsv.getCluster(strTableName);
+		
+		
 
-        // Get the value of the clustering key from the inserted data
-        Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+	    // Check if clustering key column exists
+	    if (clusteringKeyColumn == null) {
+	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
+	    }
 
-        // Find the correct page to insert the tuple
-        Page targetPage = null;
-        for (Page page : targetTable.pages) {
-            Tuple firstTuple = page.getFirstTuple();
-            Tuple lastTuple = page.getLastTuple();
-            Object firstKey = firstTuple != null ? firstTuple.getValue(clusteringKeyColumn) : null;
-            Object lastKey = lastTuple != null ? lastTuple.getValue(clusteringKeyColumn) : null;
-            if ((firstKey == null || ((Comparable) clusteringKeyValue).compareTo(firstKey) >= 0) &&
-                (lastKey == null || ((Comparable) clusteringKeyValue).compareTo(lastKey) <= 0)) {
-                targetPage = page;
-                break;
-            }
-        }
-        if (targetPage == null) {
-            // Create a new page if no suitable page is found
-            targetPage = new Page();
-            targetTable.pages.add(targetPage);
-        }
-/////////////////////////////////////////////////////////////////////////////////////
-        // Insert the tuple into the page
-        Vector<Tuple> temp = new Vector<>();
-        boolean inserted = false;
-        // Iterate through existing tuples to find the correct position to insert the new tuple
-        for (Tuple tuple : targetPage.getTuples()) {
-            // Compare primary key values
-            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-                // If the new tuple's primary key is less than the current tuple's primary key, insert it into the temp vector
-                temp.add(new Tuple(htblColNameValue));
-                inserted = true; // Flag to indicate that the new tuple has been inserted
-            }
-            // Insert the current tuple into the temp vector
-            temp.add(tuple);
-        }
+	    // Load the target table from file
+	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 
-        // If the new tuple hasn't been inserted yet (e.g., if it's greater than all existing tuples), add it to the end
-        if (!inserted) {
-            temp.add(new Tuple(htblColNameValue));
-        }
+	    // Check if the target table exists
+	    if (targetTable == null) {
+	        throw new DBAppException("Table not found: " + strTableName);
+	    }
 
-        // If the temp vector is still empty, it means the new tuple should be inserted at the end
-        if (temp.isEmpty()) {
-            temp.add(new Tuple(htblColNameValue));
-        }
+	    // Get the clustering key value
+	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
-        // Replace the existing tuples with the temp vector
-        targetPage.setTuples(temp);
+	    // Initialize variables
+	    Page targetPage = null;
 
-        // Check if the page is full, then handle shifting if needed
-        if (targetPage.isFull()) {
-            // If it's the last page, create a new page
-            if (targetTable.pages.indexOf(targetPage) == targetTable.pages.size() - 1) {
-                Page newPage = new Page();
-                targetTable.pages.add(newPage);
-            } else {
-                // Otherwise, shift a row down to the following page
-                Page nextPage = targetTable.pages.get(targetTable.pages.indexOf(targetPage) + 1);
-                nextPage.shiftRow(targetPage);
-            }
-        }
+	    // Iterate over pages in the table
+	    for (String page : targetTable.getPages()) {
+	        Page currPage = Page.loadFromFile(page);
+	        Tuple lastTuple = currPage.getLastTuple();
+	        Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
+	        if (!currPage.isFull()) {
+	            targetPage = currPage;
+	            break;
+	        }
+	    }
 
-        // Save the table back to disk
-        targetTable.saveToFile(strTableName + ".ser");
-//		throw new DBAppException("not implemented yet");
+	    // If no suitable page is found, create a new page
+	    if (targetPage == null) {
+	        targetPage = new Page();
+	        String lastPage = targetTable.getLastPage();
+	        int lastPageNumber = getPageNumber(lastPage);
+	        int incPageNumber = lastPageNumber + 1;
+	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+	    }
+
+	    // Check if the target page is full
+	    if (!targetPage.isFull()) {
+	        Vector<Tuple> temp = new Vector<>();
+	        boolean inserted = false;
+
+	        // Iterate over tuples in the target page
+	        for (Tuple tuple : targetPage.getTuples()) {
+	            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	            // Compare primary key values to find the correct position to insert the new tuple
+	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+	                inserted = true;
+	            }
+	            temp.add(tuple);
+	        }
+
+	        // If the new tuple hasn't been inserted yet, add it to the end
+	        if (!inserted) {
+	            temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+	        }
+
+	        // Update the target page with the new tuples
+	        targetPage.setTuples(temp);
+	    } else {
+	        // If the target page is full
+	        if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
+	            // If it's the last page, create a new page
+	            targetPage = new Page();
+	            String lastPage = targetTable.getLastPage();
+	            int lastPageNumber = getPageNumber(lastPage);
+	            int incPageNumber = lastPageNumber + 1;
+	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+	        } else {
+	            // Otherwise, shift a row down to the following page
+	            String nextPageString = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
+	            Page nextPage = Page.loadFromFile(nextPageString);
+	            Tuple shiftedTuple = targetPage.getLastTuple();
+	            targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
+	            Vector<Tuple> temp = new Vector<>();
+	            boolean inserted = false;
+
+	            // Iterate through existing tuples to find the correct position to insert the new tuple
+	            for (Tuple tuple : targetPage.getTuples()) {
+	                // Compare primary key values
+	                Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	                if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                    temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+	                    inserted = true;
+	                }
+	                temp.add(tuple);
+	            }
+
+	            // If the new tuple hasn't been inserted yet, add it to the end
+	            if (!inserted) {
+	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+	            }
+
+	            // Update the target page with the new tuples
+	            targetPage.setTuples(temp);
+
+	            Vector<Tuple> tmp = new Vector<>();
+	            tmp.add(shiftedTuple);
+	            for (Tuple tuple : nextPage.getTuples()) {
+	                if (!tuple.equals(shiftedTuple)) {
+	                    tmp.add(tuple);
+	                }
+	            }
+	            nextPage.setTuples(tmp);
+	        }
+	    }
+
+	    // Save changes to files
+	    targetPage.saveToFile("Student0.ser");
+	    targetTable.saveToFile(strTableName + ".ser");
+
 	}
-	
 
 
 	// following method updates one row only
@@ -157,64 +219,49 @@ public DBApp( ){
 	public void updateTable(String strTableName, 
 							String strClusteringKeyValue,
 							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-	    Table targetTable = null;
-	    for (Table table : theTables) {
-	        if (table.getStrTableName().equals(strTableName)) {
-	            targetTable = table;
-	            break;
-	        }
-	    }
-	    
-	    if (targetTable == null) {
-	        throw new DBAppException("Table not found: " + strTableName);
-	    }
 
+		Table targetTable = Table.loadFromFile(strTableName + ".ser");
+        if (targetTable == null) {
+            throw new DBAppException("Table not found: " + strTableName);
+        }
+        
+        List<Page> targetPage = null;
+		try {
+			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	    if (targetPage == null) {
+	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	    }
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-	    
-	    // Check if the clustering key value is provided and matches the expected type
-//	    if (strClusteringKeyValue == null || !strClusteringKeyValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(clusteringKeyColumn))) {
-//	        throw new DBAppException("Invalid clustering key value type for table " + strTableName);
-//	    }
-	    
-	    // Locate the page and tuple to update
-	    Tuple tupleToUpdate = null;
-	    Page pageToUpdate = null;
-	    
-	    for (Page page : targetTable.getPages()) {
-	        for (Tuple tuple : page.getTuples()) {
-	        	//is strClusteringKeyValue always of type int?
-	        	System.out.println(tuple.getValue(clusteringKeyColumn));
-	            if (tuple.getValue(clusteringKeyColumn).equals(Integer.parseInt(strClusteringKeyValue))) {
-	                tupleToUpdate = tuple;
-	                pageToUpdate = page;
-	                break;
-	            }
-	        }
-	        if (tupleToUpdate != null) {
-	            break;
-	        }
+	    // Find the tuple to update
+	    Tuple targetTuple = null;
+	    int pageIndex = 0;
+	    for(int i = 0;i<targetPage.size();i++) {
+		    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
+//		    	System.out.println(tuple);
+		    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
+		        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
+		        	pageIndex = i;
+		            targetTuple = tuple;
+		            break;
+		        }
+		    }
+	    }
+	    if (targetTuple == null) {
+	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
 	    
-	    if (tupleToUpdate == null) {
-	        throw new DBAppException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
-	    }
-	    
-	    // Update the tuple with new values
-	    for (String columnName : htblColNameValue.keySet()) {
-	        if (!columnName.equals(clusteringKeyColumn)) { // Skip clustering key column
-	            Object newValue = htblColNameValue.get(columnName);
-	            
-//	            // Check if the new value type matches the expected type
-//	            if (!newValue.getClass().getSimpleName().equalsIgnoreCase(targetTable.getHtblColNameType().get(columnName))) {
-//	                throw new DBAppException("Invalid data type for column " + columnName + " in table " + strTableName);
-//	            }
-	            
-	            tupleToUpdate.addTuple(columnName, newValue);
-	        }
-	    }
-	    
-	    // Save the updated page back to disk
+	    (targetPage.get(pageIndex)).saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
+
+//		throw new DBAppException("not implemented yet");
+
 //		throw new DBAppException("not implemented yet");
 	}
 
@@ -222,133 +269,167 @@ public DBApp( ){
 	// following method could be used to delete one or more rows.
 	// htblColNameValue holds the key and value. This will be used in search 
 	// to identify which rows/tuples to delete. 	
-	// htblColNameValue enteries are ANDED together
-	public static void deleteFromTable(String strTableName, 
-			Hashtable<String,Object> htblColNameValue) throws DBAppException{
-
-
-		Table targetTable = null;
-		for (Table table : theTables) {
-			if (table.getStrTableName().equals(strTableName)) {
-			targetTable = table;
-			break;
-				}
-			}
-			
-			if (targetTable == null) {
-			throw new DBAppException("Table not found: " + strTableName);
-			}
-			
-			// Iterate over pages in the table
-			for (Page page : targetTable.getPages()) {
-			// Iterate over tuples in the page
-			Iterator<Tuple> tupleIterator = page.getTuples().iterator();
-			while (tupleIterator.hasNext()) {
-			Tuple tuple = tupleIterator.next();
-			
-			// Check if the tuple matches all conditions in the hashtable
-			boolean allConditions = true;
-			for (String attributeName : htblColNameValue.keySet()) {
-			Object attributeValue = htblColNameValue.get(attributeName);
-			if (!tuple.getValue(attributeName).equals(attributeValue)) {
-			    allConditions = false;
-			    break;
-			}
-			}
-			
-			// If the tuple matches all conditions, remove it from the tuple vector
-			if (allConditions) {
-			tupleIterator.remove();
-			// Check if the page is empty after removing the tuple
-				if (page.getTuples().isEmpty()) {
-			    // Remove the empty page from the table
-					targetTable.getPages().remove(page);
-						}
-					}
-				}
-			}
-			
-			
-			
-			// Save the updated page(s) back to disk
-			for (Page page : targetTable.getPages()) {
-			page.saveToFile(strTableName + ".ser");
-			}
-			}
-
-
-	public Iterator selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
-		   
-	    Vector<Tuple> resultSet = new Vector<>();
 
 	    
-	    for (int i = 0; i < arrSQLTerms.length; i++) {
+
+	// htblColNameValue entries are ANDED together
+	
+
+	public static void deleteFromTable(String strTableName, Hashtable<String,Object> htblColNameValue) throws DBAppException {
+	    // Load the target table from file
+	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
+
+	    // Check if the target table exists
+	    if (targetTable == null) 
+	        throw new DBAppException("Table not found: " + strTableName);
+	    
+
+	    // Iterate over page files in the table
+	    for (String pageFile : targetTable.getPages()) {
+	    	
+	    	
 	        
-	        Vector<Tuple> termResult = new Vector<>();
-	        boolean tableFound = false;
-	        for (Table table : theTables) {
-	            if (table.getStrTableName().equals(arrSQLTerms[i]._strTableName)) {
-	                tableFound = true;
-	                
-	                for (Page page : table.getPages()) {
-	                    
-	                    for (Tuple tuple : page.getTuples()) {
-	                        
-	                        if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
-	                            termResult.add(tuple);
-	                        }
-	                    }
+	        Page page = Page.loadFromFile(pageFile);
+
+	        // Iterate over tuples in the page
+	        Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+	        while (tupleIterator.hasNext()) {
+	            Tuple tuple = tupleIterator.next();
+
+	            // Check if the tuple matches all conditions in the hashtable
+	            boolean allConditions = true;
+	            for (String attributeName : htblColNameValue.keySet()) {
+	                Object attributeValue = htblColNameValue.get(attributeName);
+	                if (!tuple.getValue(attributeName).equals(attributeValue)) {
+	                    allConditions = false;
+	                    break;
 	                }
-	                break; 
+	            }
+
+	            // If the tuple matches all conditions, remove it from the tuple vector
+	            if (allConditions) {
+	                tupleIterator.remove();
+	            }
+	        }
+
+	        // If the page is empty after removing tuples, remove it from the table
+	        if (page.getTuples().isEmpty()) {
+	            targetTable.getPages().remove(pageFile);
+	            // Delete the page file from the file system
+	            File file = new File(pageFile);
+	            if (!file.delete()) 
+	                System.err.println("Failed to delete page file: " + pageFile);
+	            if (targetTable.getPages().isEmpty()) 
+		            return;
+	        } else {
+	            // Save changes to page file if it's not empty
+	            page.saveToFile(pageFile);
+	        }
+	    }
+
+	    // Save changes to table file
+	    targetTable.saveToFile(strTableName + ".ser");
+	}
+
+
+
+
+	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+	    // List to hold the result set
+	    Vector<Tuple> resultSet = new Vector<>();
+
+	    // Iterate over each SQL term
+	    for (int i = 0; i < arrSQLTerms.length; i++) {
+	        // Get the result tuples for the current SQL term
+	        Vector<Tuple> termResult = new Vector<>();
+	        
+	        
+	        // Load the target table from file
+	        Table targetTable = Table.loadFromFile(arrSQLTerms[i]._strTableName + ".ser");
+	        
+	        // Check if the table exists
+	        if (targetTable == null) {
+	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
+	        }
+	        
+	        // Iterate over page file paths in the table
+	        for (String pageFilePath : targetTable.getPages()) {
+	            // Load the page from file
+	            Page page = Page.loadFromFile(pageFilePath);
+	            
+	            // Iterate over tuples in the page
+	            for (Tuple tuple : page.getTuples()) {
+	                // Check if the tuple matches the SQL term criteria
+	                if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
+	                    termResult.add(tuple);
+	                }
 	            }
 	        }
 	        
-	        if (!tableFound) 
-	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
-	        
-
-	        
+	        // Apply logical operation between result tuples and resultSet
 	        if (i == 0) {
 	            resultSet.addAll(termResult);
 	        } else {
 	            String operator = strarrOperators[i - 1];
 	            Vector<Tuple> result = new Vector<>();
+	            
 	            switch (operator) {
 	                case "AND":
-	            	    for (Tuple tuple : resultSet) 
-	            	        if (termResult.contains(tuple)) 
-	            	            result.add(tuple);
-	            	    
-	            	    resultSet = result;
-	            	    break;
+	                    for (Tuple tuple : resultSet) {
+	                        if (containsTupleWithClusteringKey(termResult, tuple)) {
+	                            result.add(tuple);
+	                        }
+	                    }
+	                    resultSet = result;
+	                    break;
+	                    
 	                case "OR":
-	                	result = new Vector<>(resultSet);
-	            	    for (Tuple tuple : termResult) 
-	            	        if (!result.contains(tuple)) 
-	            	            result.add(tuple);
-	            	    
-	            	    resultSet = result;
+	                    result.addAll(resultSet);
+	                    for (Tuple tuple : termResult) {
+	                        if (!containsTupleWithClusteringKey(result, tuple)) {
+	                            result.add(tuple);
+	                        }
+	                    }
+	                    resultSet = result;
 	                    break;
+	                    
 	                case "XOR":
-	                	result = new Vector<>();
-	            	    for (Tuple tuple : resultSet) 
-	            	        if (!termResult.contains(tuple)) 
-	            	            result.add(tuple);
-	            	    
-	            	    for (Tuple tuple : termResult) 
-	            	        if (!resultSet.contains(tuple)) 
-	            	            result.add(tuple);
-	            	    
-	            	    resultSet = result;
+	                    for (Tuple tuple : resultSet) {
+	                        if (!containsTupleWithClusteringKey(termResult, tuple)) {
+	                            result.add(tuple);
+	                        }
+	                    }
+	                    for (Tuple tuple : termResult) {
+	                        if (!containsTupleWithClusteringKey(resultSet, tuple)) {
+	                            result.add(tuple);
+	                        }
+	                    }
+	                    resultSet = result;
 	                    break;
+	                    
 	                default:
-	                    throw new IllegalArgumentException("Unsupported starroperator: " + operator);
+	                    throw new IllegalArgumentException("Unsupported operator: " + operator);
 	            }
 	        }
+
+	        // Method to check if a vector of tuples contains a tuple with the same clustering key value
+	        
 	    }
 
 	    return resultSet.iterator();
+
 	}
+
+	private boolean containsTupleWithClusteringKey(Vector<Tuple> tuples, Tuple targetTuple) {
+        Object targetKeyValue = targetTuple.getClusteringKeyValue();
+        for (Tuple tuple : tuples) {
+            Object keyValue = tuple.getClusteringKeyValue();
+            if (keyValue.equals(targetKeyValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 
 	private boolean tupleMatchesCriteria(Tuple tuple, SQLTerm sqlTerm) throws DBAppException{
@@ -391,10 +472,11 @@ public DBApp( ){
 	        throw new DBAppException("Invalid Comparison: " + tupleValue.getClass().getName());
 	    
 	}
-
-
-	public static void main( String[] args ){
 	
+	public static void main( String[] args ){
+		
+		//System.out.println(getPageNumber("Page-1.ser"));
+		
 	try{
 //		Hashtable htblColNameType = new Hashtable( );
 //		htblColNameType.put("id", "java.lang.Integer");
@@ -423,43 +505,31 @@ public DBApp( ){
 		 
 
 
-        // Load page from file
-//        int totalTuples = 40000;
-//        int N = 200;
-//        int totalPages = totalTuples / N;
-//
-//        for (int i = 0; i < totalPages; i++) {
-//            Page page = new Page();
-//            for (int j = 0; j < N; j++) {
-//                page.addTuple(new Tuple("Name" + (i * N + j), 20, "Address"));
-//            }
-//            page.saveToFile("page" + (i + 1) + ".bin");
-//        }
-  
-         //System.out.println(CurrentPageNumber("page5"));
-        // Load and display the first page to verify
-//        Page loadedPage = Page.loadFromFile("page1.bin");
-//        if (loadedPage != null) {
-//            System.out.println("Loaded Page Contents: " + loadedPage.toString());
-//        } else {
-//            System.out.println("Failed to load page.");
-//        }
-//        
-//		
+	
 		String strTableName = "Student";
 		DBApp	dbApp = new DBApp( );
-////			
+////		
+		
 			Hashtable htblColNameType = new Hashtable( );
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
-			dbApp.createTable( strTableName, "id", htblColNameType );
-			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
-//
+			//dbApp.createTable( strTableName, "id", htblColNameType );
+			
+//			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+////
+			
+			//Hashtable htblColNameValue = new Hashtable( );
+			//htblColNameValue.put("id", new Integer( 1 ));
+
+			
+			
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343432 ));
+			htblColNameValue.put("id", new Integer( 2343432));
+
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
+
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 
 //////		
@@ -470,35 +540,115 @@ public DBApp( ){
 ////			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			dbApp.updateTable(strTableName, "2343432", htblColNameValue);
 
-//			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 5674567 ));
-//			htblColNameValue.put("name", new String("Dalia Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 1.25 ) );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343433));
+			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer( 2343434));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			/*
+			Hashtable htblColNameForDelete = new Hashtable( );
+			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
+			htblColNameForDelete.put("gpa", new Double( 0.95 ) );
+			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			htblColNameForDelete = new Hashtable( );
+			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
+			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			htblColNameForDelete = new Hashtable( );
+			htblColNameForDelete.put("name", new String("Ahmed Noor" ) );
+			htblColNameForDelete.put("gpa", new Double( 0.95 ) );
+			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			*/
+			/*
+			////testing select
+			
+			SQLTerm[] arrSQLTerms = new SQLTerm[2];
+			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+			arrSQLTerms[0]._strTableName = "Student";
+			arrSQLTerms[0]._strColumnName= "name";
+			arrSQLTerms[0]._strOperator = "!=";
+			arrSQLTerms[0]._objValue = "Ahmed Noor";
+
+			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+			arrSQLTerms[1]._strTableName = "Student";
+			arrSQLTerms[1]._strColumnName= "gpa";
+			arrSQLTerms[1]._strOperator = "=";
+			arrSQLTerms[1]._objValue = new Double(0.95);
+>>>>>>> AmrBranchOmarTesting
+
+			String[] strarrOperators = new String[1];
+			strarrOperators[0] = "AND";
+			// select * from Student where name = “John Noor” or gpa = 1.5;
+			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+			System.out.println("Result Set:");
+			while (resultSet.hasNext()) {
+			    Tuple tuple = (Tuple) resultSet.next();
+			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
+			}
+			
+			
+			
+			htblColNameValue.clear( );
+//			htblColNameValue.put("id", new Integer( 1 ));
+			htblColNameValue.put("name", new String("Ahmed Noorrr" ) );
+			htblColNameValue.put("gpa", new Double( 0.8 ) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
-//			
-//			  // Step 1: Read the serialized table file
+			dbApp.updateTable(strTableName, "2", htblColNameValue);
+			dbApp.updateTable(strTableName, "1", htblColNameValue);
+//			htblColNameValue.clear( );
+				*/
+			
+			SQLTerm[] arrSQLTerms = new SQLTerm[3];
+			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+			arrSQLTerms[0]._strTableName = "Student";
+			arrSQLTerms[0]._strColumnName= "name";
+			arrSQLTerms[0]._strOperator = "!=";
+			arrSQLTerms[0]._objValue = "Ahmed Noor";
+
+			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+			arrSQLTerms[1]._strTableName = "Student";
+			arrSQLTerms[1]._strColumnName= "gpa";
+			arrSQLTerms[1]._strOperator = "!=";
+			arrSQLTerms[1]._objValue = new Double(0.95);
+			
+			arrSQLTerms[2] = new SQLTerm(); // Initialize the second element
+			arrSQLTerms[2]._strTableName = "Student";
+			arrSQLTerms[2]._strColumnName= "gpa";
+			arrSQLTerms[2]._strOperator = "=";
+			arrSQLTerms[2]._objValue = new Double(0.75);
+
+			String[] strarrOperators = new String[2];
+			strarrOperators[0] = "XOR";
+			strarrOperators[1] = "OR";
+			// select * from Student where name = “John Noor” or gpa = 1.5;
+			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+			System.out.println("Result Set:");
+			while (resultSet.hasNext()) {
+			    Tuple tuple = (Tuple) resultSet.next();
+			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
+			}
+			
+			
+			
+			///////////////////////////////////////////////////////////
 			FileInputStream fileIn = new FileInputStream("Student.ser");
 
             // Step 2: Deserialize the table object
             ObjectInputStream objectIn = new ObjectInputStream(fileIn);
             Table table = (Table) objectIn.readObject();
             objectIn.close();
-////
-////            // Step 3: Access the tuples
-////            // Iterate through each page in the table
-////            for (Page page : table.getPages()) {
-////                // Access the tuples within the page
-////                Vector<Tuple> tuples = page.getTuples();
-////                for (Tuple tuple : tuples) {
-////                    // Access tuple attributes as needed
-////                    // For example:
-////                    Object attributeValue = tuple.getValue("id");
-////                    System.out.println("Attribute Value: " + attributeValue);
-////                }
-////            }
-			for (Page page : table.getPages()) {
-			    Vector<Tuple> tuples = page.getTuples();
+			
+			for (String page : table.getPages()) {
+				Page currPage = Page.loadFromFile(page);
+			    Vector<Tuple> tuples = currPage.getTuples();
 			    System.out.println("Number of tuples in page: " + tuples.size());
 			    
 			    for (Tuple tuple : tuples) {
@@ -512,35 +662,7 @@ public DBApp( ){
 			    }
 			}
 ////			
-//			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 23498 ));
-//			htblColNameValue.put("name", new String("John Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 1.5 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
-//			htblColNameValue.clear( );
-//			htblColNameValue.put("id", new Integer( 78452 ));
-//			htblColNameValue.put("name", new String("Zaky Noor" ) );
-//			htblColNameValue.put("gpa", new Double( 0.88 ) );
-//			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//
-//
-//			SQLTerm[] arrSQLTerms;
-//			arrSQLTerms = new SQLTerm[2];
-//			arrSQLTerms[0]._strTableName =  "Student";
-//			arrSQLTerms[0]._strColumnName=  "name";
-//			arrSQLTerms[0]._strOperator  =  "=";
-//			arrSQLTerms[0]._objValue     =  "John Noor";
-//
-//			arrSQLTerms[1]._strTableName =  "Student";
-//			arrSQLTerms[1]._strColumnName=  "gpa";
-//			arrSQLTerms[1]._strOperator  =  "=";
-//			arrSQLTerms[1]._objValue     =  new Double( 1.5 );
-//
-//			String[]strarrOperators = new String[1];
-//			strarrOperators[0] = "OR";
-//			// select * from Student where name = "John Noor" or gpa = 1.5;
-//			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms , strarrOperators);
+
 		}
 		catch(Exception exp){
 			exp.printStackTrace( );

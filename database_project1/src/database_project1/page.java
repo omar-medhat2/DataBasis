@@ -23,6 +23,14 @@ class Tuple implements Serializable {
     public void addTuple(String attribute, Object value) {
         tuples.put(attribute, value);
     }
+    public void updateTuple(String attribute, Object newValue) {
+        if (tuples.containsKey(attribute)) {
+            tuples.put(attribute, newValue);
+        } else {
+            System.out.println("Attribute '" + attribute + "' does not exist in the tuple.");
+        }
+    }
+
 
     public Object getValue(String attribute) {
         return tuples.get(attribute);
@@ -31,21 +39,21 @@ class Tuple implements Serializable {
         return tuples.get(clusteringKeyColumn);
     }
     
-    public String serialize() throws IOException {
-        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
-        objectOutputStream.writeObject(tuples);
-        objectOutputStream.close();
-        return Base64.getEncoder().encodeToString(byteArrayOutputStream.toByteArray());
+    public void saveToFile(String filename) {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
+            out.writeObject(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
-
-    public static Tuple deserialize(String serializedData) throws IOException, ClassNotFoundException {
-        byte[] data = Base64.getDecoder().decode(serializedData);
-        ObjectInputStream objectInputStream = new ObjectInputStream(new ByteArrayInputStream(data));
-        Tuple tuples = new Tuple();
-        tuples.tuples = (Hashtable<String, Object>) objectInputStream.readObject();
-        objectInputStream.close();
-        return tuples;
+    public static Tuple loadFromFile(String filename) {
+        Tuple tuple = null;
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(filename))) {
+            tuple = (Tuple) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return tuple;
     }
 
     @Override
@@ -56,17 +64,10 @@ class Tuple implements Serializable {
         }
         return stringBuilder.toString();
     }
+    
 }
 
-	
-	
-	
 
-    
-    
-    
-	
-	
 
 
 class Page implements Serializable {
@@ -103,7 +104,6 @@ class Page implements Serializable {
     }
     
     public void shiftRow(Page sourcePage) {
-        // Shift the last tuple of the sourcePage to this page
         if (!sourcePage.tuples.isEmpty()) {
             Tuple lastTuple = sourcePage.tuples.remove(sourcePage.tuples.size() - 1);
             tuples.add(0, lastTuple);
@@ -114,12 +114,20 @@ class Page implements Serializable {
         return tuples;
     }
     
-    public int CurrentPageNumber(String PageName) {
-        int pageNumber = 0;
-            String[] parts = PageName.split("\\.");
-            String[] nameParts = parts[0].split("page");
-            pageNumber = Integer.parseInt(nameParts[1]);
-       
+    public static int getPageNumber(String pageName) {
+    	
+        StringBuilder pageNumberStr = new StringBuilder();
+
+        for (int i = 0; i < pageName.length(); i++) {
+            char ch = pageName.charAt(i);
+            if (Character.isDigit(ch)) {
+                pageNumberStr.append(ch);
+            } else if (pageNumberStr.length() > 0) {
+                break;
+            }
+        }
+        int pageNumber = Integer.parseInt(pageNumberStr.toString());
+
         return pageNumber;
     }
     @Override
@@ -145,24 +153,6 @@ class Page implements Serializable {
         }
         return null; // Return null if page is empty
     }
-    
-    public boolean contains(Object key) {
-        for (Page page : parentTable.getPages()) {
-           
-                // Check if the key is within the range of clustering keys for the tuples in the page
-                Tuple firstTuple = page.getFirstTuple();
-                Tuple lastTuple = page.getLastTuple();
-                Object firstKey = firstTuple != null ? firstTuple.getValue(strClusteringKeyColumn) : null;
-                Object lastKey = lastTuple != null ? lastTuple.getValue(strClusteringKeyColumn) : null;
-                if ((firstKey == null || ((Comparable) key).compareTo(firstKey) >= 0) &&
-                    (lastKey == null || ((Comparable) key).compareTo(lastKey) <= 0)) {
-                    return true;
-                }
-            }
-        
-        return false;
-    }
-
     
     public void saveToFile(String filename) {
         try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
