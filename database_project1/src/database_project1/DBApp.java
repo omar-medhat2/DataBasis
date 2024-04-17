@@ -338,27 +338,26 @@ public DBApp( ){
 	// htblColNameValue entries are ANDED together
 	
 
-	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
-	    // Load the target table from file
-	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
-
-	    // Check if the target table exists
-	    if (targetTable == null) {
+	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
+	    
+		
+		boolean TableExists = createcsv.TableNameExists(strTableName);
+	    if (!TableExists) 
 	        throw new DBAppException("Table not found: " + strTableName);
-	    }
+	    
 
-	    // Get the iterator for page files in the table
+	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 	    Iterator<String> pageIterator = targetTable.getPages().iterator();
 	    while (pageIterator.hasNext()) {
 	        String pageFile = pageIterator.next();
 	        Page page = Page.loadFromFile(pageFile);
 
-	        // Iterate over tuples in the page
+	        
 	        Iterator<Tuple> tupleIterator = page.getTuples().iterator();
 	        while (tupleIterator.hasNext()) {
 	            Tuple tuple = tupleIterator.next();
 
-	            // Check if the tuple matches all conditions in the hashtable
+	            
 	            boolean allConditions = true;
 	            for (String attributeName : htblColNameValue.keySet()) {
 	                Object attributeValue = htblColNameValue.get(attributeName);
@@ -368,34 +367,34 @@ public DBApp( ){
 	                }
 	            }
 
-	            // If the tuple matches all conditions, remove it from the tuple vector
+	            
 	            if (allConditions) {
 	                tupleIterator.remove();
 	            }
 	        }
 
-	        // If the page is empty after removing tuples, remove it from the table
+	        
 	        if (page.getTuples().isEmpty()) {
-	            pageIterator.remove(); // Remove the page file from the table
-	            // Delete the page file from the file system
+	            pageIterator.remove(); 
+	            
 	            File file = new File(pageFile);
 	            if (!file.delete()) {
 	                System.err.println("Failed to delete page file: " + pageFile);
 	            }
 	        } else {
-	            // Save changes to page file if it's not empty
+	            
 	            page.saveToFile(pageFile);
 	        }
 	    }
 
-	    // Save changes to table file
+	    
 	    targetTable.saveToFile(strTableName + ".ser");
 	}
 
 
 
 
-	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
+	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException, IOException {
 	    // List to hold the result set
 	    Vector<Tuple> resultSet = new Vector<>();
 
@@ -404,14 +403,12 @@ public DBApp( ){
 	        // Get the result tuples for the current SQL term
 	        Vector<Tuple> termResult = new Vector<>();
 	        
-	        
+	        boolean TableExists = createcsv.TableNameExists(arrSQLTerms[i]._strTableName);
+		    if (!TableExists) 
+		        throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
 	        // Load the target table from file
 	        Table targetTable = Table.loadFromFile(arrSQLTerms[i]._strTableName + ".ser");
 	        
-	        // Check if the table exists
-	        if (targetTable == null) {
-	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
-	        }
 	        
 	        // Iterate over page file paths in the table
 	        for (String pageFilePath : targetTable.getPages()) {
@@ -577,7 +574,7 @@ public DBApp( ){
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
-			dbApp.createTable( strTableName, "id", htblColNameType );
+			//dbApp.createTable( strTableName, "id", htblColNameType );
 			
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
@@ -592,54 +589,55 @@ public DBApp( ){
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(2));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(3));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(4));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(5));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(6));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(7));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(8));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(9));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
 			
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
-			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			//dbApp.deleteFromTable("Student", htblColNameForDelete);
+			 //System.out.println(createcsv.TableNameExists("Student3"));
 			
 			/*
 			htblColNameForDelete = new Hashtable( );
@@ -651,14 +649,14 @@ public DBApp( ){
 			htblColNameForDelete.put("gpa", new Double( 0.95 ) );
 			dbApp.deleteFromTable("Student", htblColNameForDelete);
 			*/
-			/*
+			
 			////testing select
 			
 			SQLTerm[] arrSQLTerms = new SQLTerm[2];
 			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
 			arrSQLTerms[0]._strTableName = "Student";
 			arrSQLTerms[0]._strColumnName= "name";
-			arrSQLTerms[0]._strOperator = "!=";
+			arrSQLTerms[0]._strOperator = "=";
 			arrSQLTerms[0]._objValue = "Ahmed Noor";
 
 			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
@@ -666,10 +664,10 @@ public DBApp( ){
 			arrSQLTerms[1]._strColumnName= "gpa";
 			arrSQLTerms[1]._strOperator = "=";
 			arrSQLTerms[1]._objValue = new Double(0.95);
->>>>>>> AmrBranchOmarTesting
+
 
 			String[] strarrOperators = new String[1];
-			strarrOperators[0] = "AND";
+			strarrOperators[0] = "OR";
 			// select * from Student where name = “John Noor” or gpa = 1.5;
 			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
 			System.out.println("Result Set:");
@@ -677,7 +675,7 @@ public DBApp( ){
 			    Tuple tuple = (Tuple) resultSet.next();
 			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
 			}
-			
+			/*
 			
 			
 			htblColNameValue.clear( );

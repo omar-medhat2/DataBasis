@@ -66,5 +66,16 @@ public class createcsv {
             }
         }
         return null;
-}
+        
+	}
+	public static boolean TableNameExists(String tableName) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+        for (String line : lines) {
+            String[] fields = line.split(",");
+            if (fields.length >= 3 && fields[0].equals(tableName)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
