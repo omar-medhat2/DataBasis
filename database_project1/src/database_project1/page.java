@@ -15,10 +15,16 @@ class Tuple implements Serializable {
         this.tuples = tuples;
     }
     
+    
+    
+    
+    
     public Tuple(Hashtable<String, Object> tuples, String clusteringKeyColumn) {
         this.tuples = tuples;
         this.clusteringKeyColumn = clusteringKeyColumn;
     }
+    
+    
     
     public void addTuple(String attribute, Object value) {
         tuples.put(attribute, value);
@@ -31,8 +37,17 @@ class Tuple implements Serializable {
         }
     }
 
+    
+    public static Hashtable<String, Object> getHashTable(Tuple tuple)
+    {
+    	return tuple.tuples;
+    }
 
-    public Object getValue(String attribute) {
+    public void setTuples(Hashtable<String, Object> tuples) {
+		this.tuples = tuples;
+	}
+
+	public Object getValue(String attribute) {
         return tuples.get(attribute);
     }
     public Object getClusteringKeyValue() {
