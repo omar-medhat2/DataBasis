@@ -39,6 +39,29 @@ public class Table implements Serializable{
 		return pages.lastElement();
 				}
 	
+	public String getIndexByClusteringKey(Object clusteringKeyValue) throws IOException {
+		String keyColumnName = createcsv.getCluster(strTableName);
+		String keyColumnType = createcsv.getType(strTableName, keyColumnName);
+		if(keyColumnType == "B+tree") {
+			return "B+tree";
+		}
+		return null;
+	}
+	public String getTypeOfClusterkingKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
+
+	    String keyColumnName = createcsv.getCluster(strTableName);
+	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
+
+	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
+	    	return "double";
+	    } 
+	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
+	    	return "string";
+	    } 
+	    else {
+	    	return "integer";
+	    }
+	}
 	public List<Page> retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
 	    int comparisonResult = 1;
 	    List<Page> currentPage = new ArrayList<Page>();

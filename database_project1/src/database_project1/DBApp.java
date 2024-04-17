@@ -68,9 +68,9 @@ public DBApp( ){
 	                                Hashtable<String,String> htblColNameType) throws DBAppException {
 	    // Check if the table file already exists
 	    File tableFile = new File(strTableName + ".ser");
-	    if (tableFile.exists()) {
-	        throw new DBAppException("Table already exists: " + strTableName);
-	    }
+//	    if (tableFile.exists()) {
+//	        throw new DBAppException("Table already exists: " + strTableName);
+//	    }
 
 	    // Create a new table
 	    Table newTable = new Table();
@@ -235,6 +235,7 @@ public DBApp( ){
         List<Page> targetPage = null;
 		try {
 			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
+//			System.out.println(targetTable.getIndexByClusteringKey(strClusteringKeyValue));
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -249,20 +250,44 @@ public DBApp( ){
 	    // Find the tuple to update
 	    Tuple targetTuple = null;
 	    int pageIndex = 0;
-	    for(int i = 0;i<targetPage.size();i++) {
-		    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
-//		    	System.out.println(tuple);
-		    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
-		        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
-		        	pageIndex = i;
-		            targetTuple = tuple;
-		            break;
-		        }
+	    String indexType = targetTable.getIndexByClusteringKey(strClusteringKeyValue);
+	    
+	    if ("B+tree".equals(indexType)) {
+	        // Handle B+ tree indexed table update
+	        BPlusTree<Object, Object> bPlusTree = targetTable.getBPlusTree();
+	        if (bPlusTree == null) {
+	            throw new DBAppException("B+ tree index not found for table: " + strTableName);
+	        }
+
+	        // Convert the clustering key value to the appropriate type
+	        clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
+	        Object clusteringKeyValueObject = convertToType(strClusteringKeyValue, targetTable.getTypeOfClusterkingKey(clusteringKeyColumn));
+
+	        // Update using B+ tree
+	        if (!bPlusTree.update(clusteringKeyValueObject, null, htblColNameValue)) {
+	            throw new DBAppException("Failed to update row with clustering key " + strClusteringKeyValue + " in table " + strTableName);
+	        }
+
+	        // Save the updated B+ tree and table
+//	        bPlusTree.saveToFile(strTableName + "_BPlusTree.ser");
+	        targetTable.saveToFile(strTableName + ".ser");
+	    } else {
+
+		    for(int i = 0;i<targetPage.size();i++) {
+			    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
+	//		    	System.out.println(tuple);
+			    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
+			        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
+			        	pageIndex = i;
+			            targetTuple = tuple;
+			            break;
+			        }
+			    }
 		    }
-	    }
-	    if (targetTuple == null) {
-	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
-	    }
+		    if (targetTuple == null) {
+		        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+		    }
+		}
 	    
 	    (targetPage.get(pageIndex)).saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
@@ -281,6 +306,21 @@ public DBApp( ){
 
 	// htblColNameValue entries are ANDED together
 	
+	private Object convertToType(String value, String type) {
+	    // Convert string value to the specified type
+	    // You might need to add more type conversions based on your supported types
+	    switch (type.toLowerCase()) {
+	        case "integer":
+	            return Integer.parseInt(value);
+	        case "double":
+	            return Double.parseDouble(value);
+	        case "string":
+	            return value;
+	        // Add more cases as needed
+	        default:
+	            throw new IllegalArgumentException("Unsupported type: " + type);
+	    }
+	}
 
 	public static void deleteFromTable(String strTableName, Hashtable<String,Object> htblColNameValue) throws DBAppException {
 	    // Load the target table from file
@@ -521,7 +561,7 @@ public DBApp( ){
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
-			//dbApp.createTable( strTableName, "id", htblColNameType );
+			dbApp.createTable( strTableName, "id", htblColNameType );
 			
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
@@ -532,24 +572,24 @@ public DBApp( ){
 			
 			
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343432));
+			htblColNameValue.put("id", new Integer( 1));
 
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 
-			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
 
 			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343433));
+			htblColNameValue.put("id", new Integer( 2));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
 			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343434));
+//			htblColNameValue.put("id", new Integer( 2343434));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.updateTable( strTableName ,"2", htblColNameValue );
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
@@ -603,61 +643,61 @@ public DBApp( ){
 //			htblColNameValue.clear( );
 				*/
 			
-			SQLTerm[] arrSQLTerms = new SQLTerm[3];
-			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
-			arrSQLTerms[0]._strTableName = "Student";
-			arrSQLTerms[0]._strColumnName= "name";
-			arrSQLTerms[0]._strOperator = "!=";
-			arrSQLTerms[0]._objValue = "Ahmed Noor";
-
-			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
-			arrSQLTerms[1]._strTableName = "Student";
-			arrSQLTerms[1]._strColumnName= "gpa";
-			arrSQLTerms[1]._strOperator = "!=";
-			arrSQLTerms[1]._objValue = new Double(0.95);
-			
-			arrSQLTerms[2] = new SQLTerm(); // Initialize the second element
-			arrSQLTerms[2]._strTableName = "Student";
-			arrSQLTerms[2]._strColumnName= "gpa";
-			arrSQLTerms[2]._strOperator = "=";
-			arrSQLTerms[2]._objValue = new Double(0.75);
-
-			String[] strarrOperators = new String[2];
-			strarrOperators[0] = "XOR";
-			strarrOperators[1] = "OR";
-			// select * from Student where name = “John Noor” or gpa = 1.5;
-			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
-			System.out.println("Result Set:");
-			while (resultSet.hasNext()) {
-			    Tuple tuple = (Tuple) resultSet.next();
-			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
-			}
-			
-			
-			
-			///////////////////////////////////////////////////////////
-			FileInputStream fileIn = new FileInputStream("Student.ser");
-
-            // Step 2: Deserialize the table object
-            ObjectInputStream objectIn = new ObjectInputStream(fileIn);
-            Table table = (Table) objectIn.readObject();
-            objectIn.close();
-			
-			for (String page : table.getPages()) {
-				Page currPage = Page.loadFromFile(page);
-			    Vector<Tuple> tuples = currPage.getTuples();
-			    System.out.println("Number of tuples in page: " + tuples.size());
-			    
-			    for (Tuple tuple : tuples) {
-			        // Print out clustering key column value for each tuple
-			        Object clusteringKeyValue = tuple.getValue(table.getStrClusteringKeyColumn());
-			        System.out.println("Clustering key value: " + clusteringKeyValue);
-			        
-			        // Access tuple attributes as needed
-			        Object attributeValue = tuple.getValue("id");
-			        System.out.println("Attribute Value: " + attributeValue);
-			    }
-			}
+//			SQLTerm[] arrSQLTerms = new SQLTerm[3];
+//			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+//			arrSQLTerms[0]._strTableName = "Student";
+//			arrSQLTerms[0]._strColumnName= "name";
+//			arrSQLTerms[0]._strOperator = "!=";
+//			arrSQLTerms[0]._objValue = "Ahmed Noor";
+//
+//			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+//			arrSQLTerms[1]._strTableName = "Student";
+//			arrSQLTerms[1]._strColumnName= "gpa";
+//			arrSQLTerms[1]._strOperator = "!=";
+//			arrSQLTerms[1]._objValue = new Double(0.95);
+//			
+//			arrSQLTerms[2] = new SQLTerm(); // Initialize the second element
+//			arrSQLTerms[2]._strTableName = "Student";
+//			arrSQLTerms[2]._strColumnName= "gpa";
+//			arrSQLTerms[2]._strOperator = "=";
+//			arrSQLTerms[2]._objValue = new Double(0.75);
+//
+//			String[] strarrOperators = new String[2];
+//			strarrOperators[0] = "XOR";
+//			strarrOperators[1] = "OR";
+//			// select * from Student where name = “John Noor” or gpa = 1.5;
+//			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+//			System.out.println("Result Set:");
+//			while (resultSet.hasNext()) {
+//			    Tuple tuple = (Tuple) resultSet.next();
+//			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
+//			}
+//			
+//			
+//			
+//			///////////////////////////////////////////////////////////
+//			FileInputStream fileIn = new FileInputStream("Student.ser");
+//
+//            // Step 2: Deserialize the table object
+//            ObjectInputStream objectIn = new ObjectInputStream(fileIn);
+//            Table table = (Table) objectIn.readObject();
+//            objectIn.close();
+//			
+//			for (String page : table.getPages()) {
+//				Page currPage = Page.loadFromFile(page);
+//			    Vector<Tuple> tuples = currPage.getTuples();
+//			    System.out.println("Number of tuples in page: " + tuples.size());
+//			    
+//			    for (Tuple tuple : tuples) {
+//			        // Print out clustering key column value for each tuple
+//			        Object clusteringKeyValue = tuple.getValue(table.getStrClusteringKeyColumn());
+//			        System.out.println("Clustering key value: " + clusteringKeyValue);
+//			        
+//			        // Access tuple attributes as needed
+//			        Object attributeValue = tuple.getValue("id");
+//			        System.out.println("Attribute Value: " + attributeValue);
+//			    }
+//			}
 ////			
 
 		}

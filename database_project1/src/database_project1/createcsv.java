@@ -57,6 +57,16 @@ public class createcsv {
 	        }
 	        return null;
 	}
+	public static String getIndexType(String strTableName, String strColName) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+        for (String line : lines) {
+            String[] fields = line.split(",");
+            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName) &&(!(fields[5].equals("Null"))||(!(fields[5].equals("NULL"))) || (!(fields[5].equals("null"))))) {
+                return fields[5];
+            }
+        }
+        return null;
+	}
 	public static String getCluster(String strTableName) throws IOException {
         List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
         for (String line : lines) {
