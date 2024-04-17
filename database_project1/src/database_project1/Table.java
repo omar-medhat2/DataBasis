@@ -39,54 +39,14 @@ public class Table implements Serializable{
 		return pages.lastElement();
 				}
 	
-	public String getIndexByClusteringKey(Object clusteringKeyValue) throws IOException {
-		String keyColumnName = createcsv.getCluster(strTableName);
-		String keyColumnType = createcsv.getType(strTableName, keyColumnName);
-		if(keyColumnType == "B+tree") {
-			return "B+tree";
-		}
-		return null;
-	}
-	public String getTypeOfClusterkingKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
-
-	    String keyColumnName = createcsv.getCluster(strTableName);
-	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
-
-	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
-	    	return "double";
-	    } 
-	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
-	    	return "string";
-	    } 
-	    else {
-	    	return "integer";
-	    }
-	}
 	public List<Page> retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
-	    int comparisonResult = 1;
 	    List<Page> currentPage = new ArrayList<Page>();
 
-	    String keyColumnName = createcsv.getCluster(strTableName);
-	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
-
-	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
-	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
+	        for (int pageIndex = 0; pageIndex < pages.size(); pageIndex++) {
 	            currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
 //	            comparisonResult = Double.compare(Double.parseDouble((String) clusteringKeyValue), (Double) currentPage.max);
 	        }
-	    } 
-	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
-	        for (int pageIndex = 0; pageIndex < pages.size() - 1 && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
-	        	currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
-//	            comparisonResult = ((String) clusteringKeyValue).compareTo((String) currentPage.max);
-	        }
-	    } 
-	    else {
-	        for (int pageIndex = 0; pageIndex < pages.size() && comparisonResult != -1 && comparisonResult != 0; pageIndex++) {
-	        	currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
-//	            comparisonResult = Integer.compare(Integer.parseInt((String) clusteringKeyValue), (Integer) currentPage.max);
-	        }
-	    }
+
 	    
 	    return currentPage;
 	}

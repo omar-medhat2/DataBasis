@@ -71,13 +71,16 @@ class Tuple implements Serializable {
 
 
 class Page implements Serializable {
-    private static final int N = 200; 
+    private static final int N = 2; 
     private Vector<Tuple> tuples;
     private String strClusteringKeyColumn;
     private Table parentTable;
     
     public Page() {
         tuples = new Vector<>(N);
+    }
+    public int noOfTuples() {
+    	return N;
     }
 
     public Page(String strClusteringKeyColumn) {
