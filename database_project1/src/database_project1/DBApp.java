@@ -68,9 +68,10 @@ public DBApp( ){
 	                                Hashtable<String,String> htblColNameType) throws DBAppException {
 	    // Check if the table file already exists
 	    File tableFile = new File(strTableName + ".ser");
-	    if (tableFile.exists()) {
-	        throw new DBAppException("Table already exists: " + strTableName);
-	    }
+//	    
+//	    if (tableFile.exists()) {
+//	        throw new DBAppException("Table already exists: " + strTableName);
+//	    }
 
 	    // Create a new table
 	    Table newTable = new Table();
@@ -96,14 +97,14 @@ public DBApp( ){
 
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
 	    // Get the clustering key column from metadata
-	    String clusteringKeyColumn = createcsv.getCluster(strTableName);
+	    String clusteringKeyColumnTest = createcsv.getCluster(strTableName);
 		
 		
 
 	    // Check if clustering key column exists
-	    if (clusteringKeyColumn == null) {
-	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
-	    }
+//	    if (clusteringKeyColumn == null) {
+//	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
+//	    }
 
 	    // Load the target table from file
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
@@ -112,34 +113,39 @@ public DBApp( ){
 	    if (targetTable == null) {
 	        throw new DBAppException("Table not found: " + strTableName);
 	    }
-
-	    // Get the clustering key value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	   
+	    String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
+	    
 	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
-	    // Initialize variables
+	    
 	    Page targetPage = null;
 
-	    // Iterate over pages in the table
+	    
 	    for (String page : targetTable.getPages()) {
 	        Page currPage = Page.loadFromFile(page);
 	        Tuple lastTuple = currPage.getLastTuple();
 	        Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
-	        if (!currPage.isFull()) {
+	        if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 || !currPage.isFull()) {
 	            targetPage = currPage;
 	            break;
 	        }
 	    }
 
-	    // If no suitable page is found, create a new page
+	    
+	    int incPageNumber = 0;
 	    if (targetPage == null) {
 	        targetPage = new Page();
 	        String lastPage = targetTable.getLastPage();
 	        int lastPageNumber = getPageNumber(lastPage);
-	        int incPageNumber = lastPageNumber + 1;
+	       incPageNumber = lastPageNumber + 1;
+	       
 	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
 	    }
-
+	   
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 	    // Check if the target page is full
 	    if (!targetPage.isFull()) {
 	        Vector<Tuple> temp = new Vector<>();
@@ -148,9 +154,15 @@ public DBApp( ){
 	        // Iterate over tuples in the target page
 	        for (Tuple tuple : targetPage.getTuples()) {
 	            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) == 0 )
+	            {
+	            	throw new DBAppException("Tuple with same Clustering key already inserted");
+	            }
+	            
 	            // Compare primary key values to find the correct position to insert the new tuple
 	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+
+	            	temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
 	                inserted = true;
 	            }
 	            temp.add(tuple);
@@ -170,7 +182,7 @@ public DBApp( ){
 	            targetPage = new Page();
 	            String lastPage = targetTable.getLastPage();
 	            int lastPageNumber = getPageNumber(lastPage);
-	            int incPageNumber = lastPageNumber + 1;
+	            incPageNumber = lastPageNumber + 1;
 	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
 	        } else {
@@ -213,7 +225,9 @@ public DBApp( ){
 	    }
 
 	    // Save changes to files
-	    targetPage.saveToFile("Student0.ser");
+	    targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	    //System.out.print(incPageNumber);
+	    //targetPage.saveToFile("Student0.ser");
 	    targetTable.saveToFile(strTableName + ".ser");
 
 	}
@@ -521,7 +535,7 @@ public DBApp( ){
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
-			//dbApp.createTable( strTableName, "id", htblColNameType );
+			dbApp.createTable( strTableName, "id", htblColNameType );
 			
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
@@ -532,21 +546,21 @@ public DBApp( ){
 			
 			
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343432));
+			htblColNameValue.put("id", new Integer( 1));
 
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 
-			//dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
 
 			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343433));
+			htblColNameValue.put("id", new Integer( 2));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
+//			
 			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343434));
+			htblColNameValue.put("id", new Integer( 3));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
@@ -603,37 +617,37 @@ public DBApp( ){
 //			htblColNameValue.clear( );
 				*/
 			
-			SQLTerm[] arrSQLTerms = new SQLTerm[3];
-			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
-			arrSQLTerms[0]._strTableName = "Student";
-			arrSQLTerms[0]._strColumnName= "name";
-			arrSQLTerms[0]._strOperator = "!=";
-			arrSQLTerms[0]._objValue = "Ahmed Noor";
-
-			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
-			arrSQLTerms[1]._strTableName = "Student";
-			arrSQLTerms[1]._strColumnName= "gpa";
-			arrSQLTerms[1]._strOperator = "!=";
-			arrSQLTerms[1]._objValue = new Double(0.95);
-			
-			arrSQLTerms[2] = new SQLTerm(); // Initialize the second element
-			arrSQLTerms[2]._strTableName = "Student";
-			arrSQLTerms[2]._strColumnName= "gpa";
-			arrSQLTerms[2]._strOperator = "=";
-			arrSQLTerms[2]._objValue = new Double(0.75);
-
-			String[] strarrOperators = new String[2];
-			strarrOperators[0] = "XOR";
-			strarrOperators[1] = "OR";
-			// select * from Student where name = “John Noor” or gpa = 1.5;
-			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
-			System.out.println("Result Set:");
-			while (resultSet.hasNext()) {
-			    Tuple tuple = (Tuple) resultSet.next();
-			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
-			}
-			
-			
+//			SQLTerm[] arrSQLTerms = new SQLTerm[3];
+//			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+//			arrSQLTerms[0]._strTableName = "Student";
+//			arrSQLTerms[0]._strColumnName= "name";
+//			arrSQLTerms[0]._strOperator = "!=";
+//			arrSQLTerms[0]._objValue = "Ahmed Noor";
+//
+//			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+//			arrSQLTerms[1]._strTableName = "Student";
+//			arrSQLTerms[1]._strColumnName= "gpa";
+//			arrSQLTerms[1]._strOperator = "!=";
+//			arrSQLTerms[1]._objValue = new Double(0.95);
+//			
+//			arrSQLTerms[2] = new SQLTerm(); // Initialize the second element
+//			arrSQLTerms[2]._strTableName = "Student";
+//			arrSQLTerms[2]._strColumnName= "gpa";
+//			arrSQLTerms[2]._strOperator = "=";
+//			arrSQLTerms[2]._objValue = new Double(0.75);
+//
+//			String[] strarrOperators = new String[2];
+//			strarrOperators[0] = "XOR";
+//			strarrOperators[1] = "OR";
+//			// select * from Student where name = “John Noor” or gpa = 1.5;
+//			Iterator resultSet = dbApp.selectFromTable(arrSQLTerms, strarrOperators);
+//			System.out.println("Result Set:");
+//			while (resultSet.hasNext()) {
+//			    Tuple tuple = (Tuple) resultSet.next();
+//			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
+//			}
+//			
+//			
 			
 			///////////////////////////////////////////////////////////
 			FileInputStream fileIn = new FileInputStream("Student.ser");
