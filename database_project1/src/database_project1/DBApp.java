@@ -96,14 +96,14 @@ public DBApp( ){
 
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
 	    // Get the clustering key column from metadata
-	    String clusteringKeyColumn = createcsv.getCluster(strTableName);
+	    String clusteringKeyColumnTest = createcsv.getCluster(strTableName);
 		
 		
 
 	    // Check if clustering key column exists
-	    if (clusteringKeyColumn == null) {
-	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
-	    }
+//	    if (clusteringKeyColumn == null) {
+//	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
+//	    }
 
 	    // Load the target table from file
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
@@ -112,34 +112,83 @@ public DBApp( ){
 	    if (targetTable == null) {
 	        throw new DBAppException("Table not found: " + strTableName);
 	    }
-
-	    // Get the clustering key value
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	   
+	    String clusteringKeyColumn = targetTable.strClusteringKeyColumn;
+	    
 	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
-	    // Initialize variables
+	    
 	    Page targetPage = null;
 
-	    // Iterate over pages in the table
+	    
 	    for (String page : targetTable.getPages()) {
 	        Page currPage = Page.loadFromFile(page);
 	        Tuple lastTuple = currPage.getLastTuple();
 	        Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
-	        if (!currPage.isFull()) {
+	        if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 || !currPage.isFull()) {
 	            targetPage = currPage;
 	            break;
 	        }
 	    }
 
-	    // If no suitable page is found, create a new page
+	    
+	    int incPageNumber = 0;
 	    if (targetPage == null) {
 	        targetPage = new Page();
 	        String lastPage = targetTable.getLastPage();
 	        int lastPageNumber = getPageNumber(lastPage);
-	        int incPageNumber = lastPageNumber + 1;
+	       incPageNumber = lastPageNumber + 1;
+	       
 	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
 	    }
-
+	   
+//	    
+//	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
+//        Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+//        
+//        Page targetPage = null;
+//        
+//        List<String> pages = targetTable.getPages();
+//        Collections.sort(pages); // Assuming pages are sorted
+//        
+//        int low = 0;
+//        int high = pages.size() - 1;
+//        
+//        while (low <= high) {
+//            int mid = low + (high - low) / 2;
+//            Page currPage = Page.loadFromFile(pages.get(mid));
+//            Tuple firstTuple = currPage.getFirstTuple();
+//            Tuple lastTuple = currPage.getLastTuple();
+//            Object firstPrimaryKeyValue = firstTuple.getValue(clusteringKeyColumn);
+//            Object lastPrimaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
+//            
+//            if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) > 0) {
+//                // If clustering key value is greater than the last tuple's value,
+//                // search in the upper half
+//                low = mid + 1;
+//            } else if (((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) < 0) {
+//                // If clustering key value is less than the first tuple's value,
+//                // search in the lower half
+//                high = mid - 1;
+//            } else {
+//                // If clustering key value is in range of the current page's tuples
+//                targetPage = currPage;
+//                break;
+//            }
+//        }
+//        int incPageNumber = 0;
+//        if (targetPage == null) {
+//            // If target page is still null, create a new page
+//            targetPage = new Page();
+//            String lastPage = targetTable.getLastPage();
+//            int lastPageNumber = getPageNumber(lastPage);
+//            incPageNumber = lastPageNumber + 1;
+//            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+//            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+//        }
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
 	    // Check if the target page is full
 	    if (!targetPage.isFull()) {
 	        Vector<Tuple> temp = new Vector<>();
@@ -148,9 +197,15 @@ public DBApp( ){
 	        // Iterate over tuples in the target page
 	        for (Tuple tuple : targetPage.getTuples()) {
 	            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) == 0 )
+	            {
+	            	throw new DBAppException("Tuple with same Clustering key already inserted");
+	            }
+	            
 	            // Compare primary key values to find the correct position to insert the new tuple
 	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
+
+	            	temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
 	                inserted = true;
 	            }
 	            temp.add(tuple);
@@ -170,7 +225,7 @@ public DBApp( ){
 	            targetPage = new Page();
 	            String lastPage = targetTable.getLastPage();
 	            int lastPageNumber = getPageNumber(lastPage);
-	            int incPageNumber = lastPageNumber + 1;
+	            incPageNumber = lastPageNumber + 1;
 	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
 	        } else {
@@ -211,9 +266,10 @@ public DBApp( ){
 	            nextPage.setTuples(tmp);
 	        }
 	    }
-
-	    // Save changes to files
-	    targetPage.saveToFile("Student0.ser");
+	    String lastPage = targetTable.getLastPage();
+        int lastPageNumber = getPageNumber(lastPage);
+       incPageNumber = lastPageNumber ;
+	    targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	    targetTable.saveToFile(strTableName + ".ser");
 
 	}
@@ -236,10 +292,10 @@ public DBApp( ){
 		try {
 			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
+			
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			
 			e.printStackTrace();
 		}
 	    if (targetPage == null) {
@@ -282,20 +338,19 @@ public DBApp( ){
 	// htblColNameValue entries are ANDED together
 	
 
-	public static void deleteFromTable(String strTableName, Hashtable<String,Object> htblColNameValue) throws DBAppException {
+	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException {
 	    // Load the target table from file
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 
 	    // Check if the target table exists
-	    if (targetTable == null) 
+	    if (targetTable == null) {
 	        throw new DBAppException("Table not found: " + strTableName);
-	    
+	    }
 
-	    // Iterate over page files in the table
-	    for (String pageFile : targetTable.getPages()) {
-	    	
-	    	
-	        
+	    // Get the iterator for page files in the table
+	    Iterator<String> pageIterator = targetTable.getPages().iterator();
+	    while (pageIterator.hasNext()) {
+	        String pageFile = pageIterator.next();
 	        Page page = Page.loadFromFile(pageFile);
 
 	        // Iterate over tuples in the page
@@ -321,13 +376,12 @@ public DBApp( ){
 
 	        // If the page is empty after removing tuples, remove it from the table
 	        if (page.getTuples().isEmpty()) {
-	            targetTable.getPages().remove(pageFile);
+	            pageIterator.remove(); // Remove the page file from the table
 	            // Delete the page file from the file system
 	            File file = new File(pageFile);
-	            if (!file.delete()) 
+	            if (!file.delete()) {
 	                System.err.println("Failed to delete page file: " + pageFile);
-	            if (targetTable.getPages().isEmpty()) 
-		            return;
+	            }
 	        } else {
 	            // Save changes to page file if it's not empty
 	            page.saveToFile(pageFile);
@@ -480,6 +534,8 @@ public DBApp( ){
 	    
 	}
 	
+	
+	
 	public static void main( String[] args ){
 		
 		//System.out.println(getPageNumber("Page-1.ser"));
@@ -521,7 +577,7 @@ public DBApp( ){
 			htblColNameType.put("id", "java.lang.Integer");
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
-			//dbApp.createTable( strTableName, "id", htblColNameType );
+			dbApp.createTable( strTableName, "id", htblColNameType );
 			
 //			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
 ////
@@ -532,29 +588,60 @@ public DBApp( ){
 			
 			
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343432));
-
+			htblColNameValue.put("id", new Integer(1));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
 
-			//dbApp.insertIntoTable( strTableName , htblColNameValue );
-
-			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343433));
-			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
-			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
 			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2343434));
+			htblColNameValue.put("id", new Integer(2));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			/*
+			
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(3));
+			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(4));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(5));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(6));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(7));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(8));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue = new Hashtable( );
+			htblColNameValue.put("id", new Integer(9));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			
+			
 			Hashtable htblColNameForDelete = new Hashtable( );
-			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
-			htblColNameForDelete.put("gpa", new Double( 0.95 ) );
+			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
 			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			
+			/*
 			htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
@@ -602,7 +689,7 @@ public DBApp( ){
 			dbApp.updateTable(strTableName, "1", htblColNameValue);
 //			htblColNameValue.clear( );
 				*/
-			
+			/*
 			SQLTerm[] arrSQLTerms = new SQLTerm[3];
 			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
 			arrSQLTerms[0]._strTableName = "Student";
@@ -632,7 +719,7 @@ public DBApp( ){
 			    Tuple tuple = (Tuple) resultSet.next();
 			    System.out.println(tuple); // Assuming Tuple class overrides the toString() method
 			}
-			
+			*/
 			
 			
 			///////////////////////////////////////////////////////////
