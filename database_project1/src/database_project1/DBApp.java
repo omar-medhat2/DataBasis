@@ -208,52 +208,49 @@ public DBApp( ){
 	        targetPage.setTuples(temp);
 	    } 
 	    
-	         else {
-	        	 for (int i = 0; i < targetTable.getPages().size(); i++) {
-	        	        Tuple shiftedTuple = targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
-	        	        if (!targetPage.isFull()) {
-	        	        	Vector<Tuple> temp = new Vector<>();
-	        		        boolean inserted = false;
+	    else {
+	        Tuple shiftedTuple = null;
+	        boolean tupleInserted = false; // Flag to track whether the tuple has been inserted
+	        for (int i = 0; i < targetTable.getPages().size(); i++) {
+	            shiftedTuple = targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
+	            if (!targetPage.isFull()) {
+	                Vector<Tuple> temp = new Vector<>();
+	                boolean inserted = false;
 
-	        		        
-	        		        for (Tuple tuple : targetPage.getTuples()) {
-	        		            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-	        		            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) == 0 )
-	        		            {
-	        		            	throw new DBAppException("Tuple with same Clustering key already inserted");
-	        		            }
-	        		            
-	        		            
-	        		            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                for (Tuple tuple : targetPage.getTuples()) {
+	                    Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
+	                    if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) == 0) {
+	                        throw new DBAppException("Tuple with the same Clustering key already inserted");
+	                    }
 
-	        		            	temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	        		                inserted = true;
-	        		            }
-	        		            temp.add(tuple);
-	        		        }
+	                    if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                        temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
+	                        inserted = true;
+	                    }
+	                    temp.add(tuple);
+	                }
 
-	        		      
-	        		        if (!inserted) {
-	        		            temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	        		        }
+	                if (!inserted) {
+	                    temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
+	                }
 
-	        		        
-	        		        targetPage.setTuples(temp);
-	        		        
-                            
-	        	           
-	        	        } 
-	        	        Hashtable newHash = Tuple.getHashTable(shiftedTuple);
-        	            insertIntoTable(strTableName, newHash);
-        	            
-	        	        if (i == targetTable.getPages().size() - 1) {
-        	                Page newPage = new Page();
-        	                newPage.getTuples().add(shiftedTuple);
-        	                newPage.saveToFile(strTableName + (i + 1) + ".ser");
-        	                targetTable.getPages().add(strTableName + (i + 1) + ".ser");
-        	            } 
-	        	    }
-	    	}
+	                targetPage.setTuples(temp);
+	                tupleInserted = true; // Set the flag to true once the tuple has been inserted
+	                break; // Exit the loop after inserting the tuple
+	            }
+	        }
+
+	        // If the tuple has been successfully inserted, save changes and exit the method
+	        if (tupleInserted) {
+	            // Save changes to the target page before inserting new data
+	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	            targetTable.saveToFile(strTableName + ".ser");
+	            // Insert new data into the table after modifications to the current page
+	            Hashtable newHash = Tuple.getHashTable(shiftedTuple);
+	            insertIntoTable(strTableName, newHash);
+	            return; // Exit the method after successful insertion
+	        }
+	    }
 	            
 	   // Hashtable newHash = Tuple.getHashTable(shiftedTuple);
 	    String lastPage = targetTable.getLastPage();
