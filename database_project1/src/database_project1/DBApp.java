@@ -94,6 +94,11 @@ public DBApp( ){
 		throw new DBAppException("not implemented yet");
 	}
 
+	
+	
+	
+	
+	
 
 	// following method inserts one row only. 
 	// htblColNameValue must include a value for the primary key
@@ -121,61 +126,80 @@ public DBApp( ){
 	    
 //	    
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-        Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
+
+	    Page targetPage = null;
         
-        Page targetPage = null;
-        
-        List<String> pages = targetTable.getPages();
-        //Collections.sort(pages); // Assuming pages are sorted
-        
-        int low = 0;
-        int high = pages.size() - 1;
-        
-        while (low <= high) {
-            int mid = low + (high - low) / 2;
-            Page currPage = Page.loadFromFile(pages.get(mid));
-            Tuple firstTuple = currPage.getFirstTuple();
-            Tuple lastTuple = currPage.getLastTuple();
-            Object firstPrimaryKeyValue = firstTuple.getValue(clusteringKeyColumn);
-            Object lastPrimaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
-            
-            if (firstTuple.equals(lastTuple)) {
-                // If there's only one tuple in the page
-                targetPage = currPage;
-                break;
-            }
-            
-            if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) > 0) {
-                // If clustering key value is greater than the last tuple's value,
-                // search in the upper half
-                low = mid + 1;
-            } else if (((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) < 0) {
-                // If clustering key value is less than the first tuple's value,
-                // search in the lower half
-                high = mid - 1;
-            } else if (((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) > 0 &&
-                       ((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) < 0 &&
-                       !currPage.isFull()) {
-                // If clustering key value is between the first and last tuple's values
-                // and the page is not full
-                targetPage = currPage;
-                break;
-            } else {
-                // If clustering key value is in range of the current page's tuples
-                targetPage = currPage;
-                break;
-            }
-        }
-        int incPageNumber = 0;
-        if (targetPage == null) {
-            // If target page is still null, create a new page
-            targetPage = new Page();
-            String lastPage = targetTable.getLastPage();
-            int lastPageNumber = getPageNumber(lastPage);
-            incPageNumber = lastPageNumber + 1;
-            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-        }
+	    
+	    List<String> pages = targetTable.getPages();
+	    int low = 0;
+	    int high = pages.size() - 1;
+        int  breakpoint = 0;
+	    while (low <= high) {
+	        int mid = low + (high - low) / 2;
+	        Page currPage = Page.loadFromFile(pages.get(mid));
+	        Tuple firstTuple = currPage.getFirstTuple();
+	        Tuple lastTuple = currPage.getLastTuple();
+	        Object firstPrimaryKeyValue = firstTuple.getValue(clusteringKeyColumn);
+	        Object lastPrimaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
+
+	        
+	        if (firstTuple.equals(lastTuple)) {
+	            // If there's only one tuple in the page
+	            targetPage = currPage;
+	            break;
+	        }
+	        
+	        if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) < 0 && ((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) < 0 && currPage.isFull())
+	        {
+	        	targetPage = currPage;
+	        	breakpoint = mid;
+	        	break;
+	        }
+	        
+	        if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) > 0 && ((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) > 0 && !currPage.isFull())
+	        {
+	        	breakpoint = mid;
+	        	break;
+	        }
+	        
+	        
+	        boolean isBetweenCurrentPage = ((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) > 0 &&
+	                                       ((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) < 0;
+
+	        if (isBetweenCurrentPage && !currPage.isFull()) {
+	            targetPage = currPage;
+	            breakpoint = mid;
+	            break;
+	        } 
+	        
+	        else if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) > 0  ) {
+	         
+	            low = mid + 1;
+	        } else if (((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) < 0   ) {
+	            
+	            high = mid - 1;
+	            
+	            
+	        } else {
+	        	
+	        	    targetPage = currPage;
+	        	    breakpoint = mid;
+	        	    break;
+	        	}
+	        
+	    }
+
+	    int incPageNumber = 0;
+	    if (targetPage == null) {
+	        // If target page is still null, create a new page
+	        targetPage = new Page();
+	        String lastPage = targetTable.getLastPage();
+	        int lastPageNumber = getPageNumber(lastPage);
+	        incPageNumber = lastPageNumber + 1;
+	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
+	    }
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
 	    // Check if the target page is full
 	    if (!targetPage.isFull()) {
@@ -206,11 +230,13 @@ public DBApp( ){
 
 	        // Update the target page with the new tuples
 	        targetPage.setTuples(temp);
-	    } 
+	    }
 	    
 	    else {
 	        Tuple shiftedTuple = null;
-	        boolean tupleInserted = false; // Flag to track whether the tuple has been inserted
+	        boolean tupleInserted = false; 
+	        int tuplesindex = 0;
+	        int index = 0;
 	        for (int i = 0; i < targetTable.getPages().size(); i++) {
 	            shiftedTuple = targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
 	            if (!targetPage.isFull()) {
@@ -224,26 +250,36 @@ public DBApp( ){
 	                    }
 
 	                    if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
+	                    	
 	                        temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
 	                        inserted = true;
 	                    }
 	                    temp.add(tuple);
+	                    
+	                    
+	                   
+	                   
+	                    
+	                    
 	                }
 
 	                if (!inserted) {
 	                    temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
+	                    
 	                }
 
 	                targetPage.setTuples(temp);
-	                tupleInserted = true; // Set the flag to true once the tuple has been inserted
+	                tupleInserted = true;
+	                index = i;
 	                break; // Exit the loop after inserting the tuple
 	            }
+	            
 	        }
 
 	        // If the tuple has been successfully inserted, save changes and exit the method
 	        if (tupleInserted) {
-	            // Save changes to the target page before inserting new data
-	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
+	        	
+	            targetPage.saveToFile(strTableName + (breakpoint) + ".ser");
 	            targetTable.saveToFile(strTableName + ".ser");
 	            // Insert new data into the table after modifications to the current page
 	            Hashtable newHash = Tuple.getHashTable(shiftedTuple);
@@ -608,8 +644,8 @@ public DBApp( ){
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
-//			T
+////			
+////			T
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
