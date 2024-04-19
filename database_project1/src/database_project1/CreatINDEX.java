@@ -1,17 +1,19 @@
 package database_project1;
 
+import java.io.IOException;
+
 public class CreatINDEX {
-	public void createIndex(String strTableName, String strColName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
+	public void createIndex(String strTableName, String strRowName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
 
 	    // Adjusting metadata file with new index
-	    boolean Isinserted = createcsv.addindextometadata(strTableName, strColName, strIndexName);
+	    boolean Isinserted = createcsv.updateIndex(strTableName, strRowName, strIndexName);
 	    if (!Isinserted) {
 	        DBAppException e = new DBAppException("The index " + strIndexName + " already exists for the table  " + strTableName);
 	        throw e;
 	    }
 
 	    // Retrieving data type for desired column
-	    String DataType = createcsv.getType(strTableName, strColName);
+	    String DataType = createcsv.getType(strTableName, strRowName);
 
 	    // Initialising b+tree
 	    BPTree BPlustree = null;
@@ -30,14 +32,14 @@ public class CreatINDEX {
 	Table currentTable = Table.loadFromFile(strTableName);
 
 	// Iterate through each page in the table
-	for (String serializedPage : currentTable.tablePages) {
+	for (String serializedPage : currentTable.pages) {
 	    // Deserialize the current page
 	    Page currentPage = Page.loadFromFile(serializedPage);
 	    
 	    // Iterate through each tuple in the current page
 	    for (Tuple currentTuple : currentPage.getTuples()) {
 	        // Retrieve the value associated with the given column name
-	        Object value = currentTuple.getValues().get(strColName);
+	        Object value = currentTuple.getValue().get(strRowName);
 	        
 	        // Insert the value and a reference to the tuple into the tree
 	        BPlustree.insert((currentPage.PageNumber) , (Comparable) value);

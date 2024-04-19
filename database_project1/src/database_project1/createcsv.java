@@ -78,4 +78,41 @@ public class createcsv {
         }
         return false;
     }
+	public static boolean updateIndex(String strTableName, String strColName, String indexName) throws IOException {
+        // Read all lines from the CSV file
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+
+        // Iterate through each line in the CSV file
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            String[] fields = line.split(",");
+
+            // Check if the line corresponds to the given table and column
+            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName)) {
+                // Update the IndexName field with the provided index name
+                fields[4] = indexName;
+                
+                // If an index name is provided, set the IndexType to "B+ Tree"
+                if (indexName != null && !indexName.isEmpty()) {
+                    fields[5] = "B+ Tree";
+                } else {
+                    // If no index name is provided, set the IndexType to "Null"
+                    fields[5] = "Null";
+                }
+
+                // Reconstruct the line with updated fields
+                lines.set(i, String.join(",", fields));
+
+                // Write the updated lines back to the CSV file
+                Files.write(Paths.get("table_metadata.csv"), lines);
+                
+                // Return true indicating successful update
+                return true;
+            }
+        }
+
+        // Return false indicating the update was not successful
+        return false;
+    }
+
 }

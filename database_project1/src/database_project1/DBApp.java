@@ -344,8 +344,18 @@ public DBApp( ){
 		boolean TableExists = createcsv.TableNameExists(strTableName);
 	    if (!TableExists) 
 	        throw new DBAppException("Table not found: " + strTableName);
-	    
-
+	    boolean EmptyHashtable = htblColNameValue.isEmpty();
+	
+	    for (String attributeName : htblColNameValue.keySet()) {
+	        String columnType = createcsv.getType(strTableName, attributeName); //column names in the hashtable are valid for the table
+	        if (columnType == null ) 
+	            throw new DBAppException("Column not found in table: " + attributeName);
+	        Object attributeValue = htblColNameValue.get(attributeName);
+	        String attributeValueType = attributeValue.getClass().getName();
+	        if (!attributeValueType.equals(columnType)) 
+	            throw new DBAppException("Type mismatch for column: " + attributeName); //Ensure Type Compatibility
+	        
+	    }
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 	    Iterator<String> pageIterator = targetTable.getPages().iterator();
 	    while (pageIterator.hasNext()) {
@@ -368,7 +378,7 @@ public DBApp( ){
 	            }
 
 	            
-	            if (allConditions) {
+	            if (allConditions || EmptyHashtable) { //it was stated on piazza that an empty hashtable meant delete everything.
 	                tupleIterator.remove();
 	            }
 	        }
@@ -397,7 +407,7 @@ public DBApp( ){
 	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException, IOException {
 	    // List to hold the result set
 	    Vector<Tuple> resultSet = new Vector<>();
-
+	    
 	    // Iterate over each SQL term
 	    for (int i = 0; i < arrSQLTerms.length; i++) {
 	        // Get the result tuples for the current SQL term
@@ -588,14 +598,12 @@ public DBApp( ){
 			htblColNameValue.put("id", new Integer(1));
 			htblColNameValue.put("name", new String("Ahmed Noor" ) );
 			htblColNameValue.put("gpa", new Double( 0.95 ) );
-
 			//dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(2));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			//dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(3));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
@@ -635,9 +643,10 @@ public DBApp( ){
 			
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
-			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
-			//dbApp.deleteFromTable("Student", htblColNameForDelete);
-			 //System.out.println(createcsv.TableNameExists("Student3"));
+			htblColNameForDelete.put("gpa", new String("abc") );
+			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			 System.out.println(createcsv.TableNameExists("Student3"));
+			
 			
 			/*
 			htblColNameForDelete = new Hashtable( );
