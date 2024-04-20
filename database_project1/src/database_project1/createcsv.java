@@ -135,5 +135,26 @@ public class createcsv {
         // No index found for the given table and column
         return null;
     }
+	
+	
+
+	public static String getColumnFromIndexName(String strTableName, String indexName) throws IOException {
+	    // Read all lines from the CSV file
+	    List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+
+	    // Iterate through each line in the CSV file
+	    for (String line : lines) {
+	        String[] fields = line.split(",");
+
+	        // Check if the line corresponds to the given table and index name
+	        if (fields.length >= 3 && fields[0].equals(strTableName) && fields[4].equals(indexName)) {
+	            // Return the column name
+	            return fields[1];
+	        }
+	    }
+	    // No column found for the given table and index name
+	    return null;
+	}
+
 
 }
