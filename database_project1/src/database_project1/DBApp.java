@@ -319,6 +319,23 @@ public void createIndex(String strTableName, String strColName, String strIndexN
 	    if (targetPage == null) {
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
+	    for (String attributeName : htblColNameValue.keySet()) {
+	        String columnType = "";
+			try {
+				columnType = createcsv.getType(strTableName, attributeName);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+	        if (columnType == null ) 
+	            throw new DBAppException("Column not found in table: " + attributeName);
+	        Object attributeValue = htblColNameValue.get(attributeName);
+	        String attributeValueType = attributeValue.getClass().getName();
+	        if(columnType.equals("java.lang.double")) {
+	        	columnType = "java.lang.Double";
+	        }
+	        if (!attributeValueType.equals(columnType)) 
+	            throw new DBAppException("Type mismatch for column: " + attributeName);
+	    }
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
 	    Tuple targetTuple = null;
 	    int j = 0;
@@ -728,7 +745,7 @@ public void createIndex(String strTableName, String strColName, String strIndexN
 			htblColNameValue = new Hashtable( );
 //			htblColNameValue.put("id", new Integer( 2343434));
 			htblColNameValue.put("name", new String("yousef" ) );
-			htblColNameValue.put("gpa", new Double( 2.75 ) );
+			htblColNameValue.put("gpa", new Double(0.2  ) );
 			dbApp.updateTable( strTableName ,"4", htblColNameValue );
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
