@@ -4,6 +4,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -85,46 +87,72 @@ public DBApp( ){
 	}
 
 
+	
+	public void createIndex(String strTableName, String strColName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
+	    
+	    if (!(createcsv.TableNameExists(strTableName))) {
+	        throw new DBAppException("Table " + strTableName + " does not exist.");
+	    }
+	    
+	    Table table = Table.loadFromFile(strTableName + ".ser");
+	    BPlusTree bPlusTree = new BPlusTree<>();
 
-	// following method creates a B+tree index 
-	public void createIndex(String   strTableName,
-							String   strColName,
-							String   strIndexName) throws DBAppException{
-		
-		throw new DBAppException("not implemented yet");
+	    Vector<String> pages = table.getPages();  
+
+	    String indexType = createcsv.getType(strTableName, strColName);
+	    for (String page : pages) {
+	    	Page CurrentPage = Page.loadFromFile(page);
+	        for (Tuple tuple : CurrentPage.getTuples()) {
+	            Object KeyValue = tuple.getValue(strColName);
+	            bPlusTree.insert((Comparable)KeyValue, page);
+	        }
+	    }
+	    bPlusTree.saveToFile(strIndexName + ".ser");
+	    //System.out.print(strIndexName);
+	    createcsv.updateIndex(strTableName, strColName, strIndexName);
 	}
-
-	
-	
-	
 	
 	
 
+	public void insertIndex(Hashtable<String, Object> htblColNameValue,String clusteringKeyColumn,String strTableName,int  breakpoint) throws IOException
+	{
+		
+		for (String columnName : htblColNameValue.keySet()) {
+	        if (!columnName.equals(clusteringKeyColumn)) {
+	        	String indexName = createcsv.getIndexName(strTableName,columnName);
+	            if (indexName != null && !indexName.isEmpty()) {
+	                Object columnValue = htblColNameValue.get(columnName);
+	                BPlusTree BP =  BPlusTree.loadFromFile(indexName + ".ser");
+	                BP.insert((Comparable) columnValue, (strTableName + (breakpoint) + ".ser"));
+	                String x = indexName + ".ser";
+	                BP.saveToFile(x);
+	                return;
+	            }
+	        }
+	    }
+	}
+	
+	
 	// following method inserts one row only. 
 	// htblColNameValue must include a value for the primary key
 
 	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
-	    // Get the clustering key column from metadata
+
 	    String clusteringKeyColumnTest = createcsv.getCluster(strTableName);
 		
 		
 
-	    // Check if clustering key column exists
-//	    if (clusteringKeyColumn == null) {
-//	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
-//	    }
 
-	    // Load the target table from file
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 
-	    // Check if the target table exists
+
 	    if (targetTable == null) {
 	        throw new DBAppException("Table not found: " + strTableName);
 	    }
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-	   
 	    
-//	    
+	    
+	    
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
 	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
 
@@ -159,10 +187,10 @@ public DBApp( ){
 	        
 	        if (((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) > 0 && ((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) > 0 && !currPage.isFull())
 	        {
+	        	targetPage = currPage;
 	        	breakpoint = mid;
-	        	break;
-	        }
-	        
+                break;
+	        }        
 	        
 	        boolean isBetweenCurrentPage = ((Comparable) clusteringKeyValue).compareTo(firstPrimaryKeyValue) > 0 &&
 	                                       ((Comparable) clusteringKeyValue).compareTo(lastPrimaryKeyValue) < 0;
@@ -230,6 +258,7 @@ public DBApp( ){
 
 	        // Update the target page with the new tuples
 	        targetPage.setTuples(temp);
+	        insertIndex(htblColNameValue,clusteringKeyColumn, strTableName, breakpoint);
 	    }
 	    
 	    else {
@@ -254,44 +283,32 @@ public DBApp( ){
 	                        temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
 	                        inserted = true;
 	                    }
-	                    temp.add(tuple);
-	                    
-	                    
-	                   
-	                   
-	                    
-	                    
+	                    temp.add(tuple);  
 	                }
-
 	                if (!inserted) {
 	                    temp.add(new Tuple(htblColNameValue, clusteringKeyColumn));
 	                    
 	                }
 
 	                targetPage.setTuples(temp);
+	                insertIndex(htblColNameValue,clusteringKeyColumn, strTableName, breakpoint);
 	                tupleInserted = true;
 	                index = i;
-	                break; // Exit the loop after inserting the tuple
+	                break; 
 	            }
 	            
 	        }
-
-	        // If the tuple has been successfully inserted, save changes and exit the method
 	        if (tupleInserted) {
-	        	
 	            targetPage.saveToFile(strTableName + (breakpoint) + ".ser");
 	            targetTable.saveToFile(strTableName + ".ser");
-	            // Insert new data into the table after modifications to the current page
 	            Hashtable newHash = Tuple.getHashTable(shiftedTuple);
 	            insertIntoTable(strTableName, newHash);
-	            return; // Exit the method after successful insertion
+	            return;
 	        }
 	    }
-	            
-	   // Hashtable newHash = Tuple.getHashTable(shiftedTuple);
 	    String lastPage = targetTable.getLastPage();
         int lastPageNumber = getPageNumber(lastPage);
-       incPageNumber = lastPageNumber ;
+        incPageNumber = lastPageNumber ;
 	    targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
 	    targetTable.saveToFile(strTableName + ".ser");
 
@@ -417,7 +434,7 @@ public DBApp( ){
 	    targetTable.saveToFile(strTableName + ".ser");
 	}
 
-
+   
 
 
 	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
@@ -592,9 +609,9 @@ public DBApp( ){
 
 
 	
-		String strTableName = "Student";
-		DBApp	dbApp = new DBApp( );
-////		
+		   String strTableName = "Student";
+		   DBApp  dbApp = new DBApp( );
+		
 		
 			Hashtable htblColNameType = new Hashtable( );
 			htblColNameType.put("id", "java.lang.Integer");
@@ -602,12 +619,8 @@ public DBApp( ){
 			htblColNameType.put("gpa", "java.lang.double");
 			dbApp.createTable( strTableName, "id", htblColNameType );
 			
-//			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
-////
-			
-			//Hashtable htblColNameValue = new Hashtable( );
-			//htblColNameValue.put("id", new Integer( 1 ));
-            
+			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+
 			
 			
 			Hashtable htblColNameValue = new Hashtable( );
@@ -621,31 +634,45 @@ public DBApp( ){
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 3));
 			htblColNameValue.put("name", new String("Ahmed Soroor" ) );
-			htblColNameValue.put("gpa", new Double( 0.95 ) );
+			htblColNameValue.put("gpa", new Double( 0.65 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //			
-			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 4));
-			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
-			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 5));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//			
-			
-			
 			
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer( 2));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameValue.put("gpa", new Double( 0.75 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			
+			
+			dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+			
+			
+			
+						
+			htblColNameValue = new Hashtable();
+			htblColNameValue.put("id", new Integer( 4));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 1.23 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			
+			
+			
+			htblColNameValue = new Hashtable();
+			htblColNameValue.put("id", new Integer( 6));
+			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
+			htblColNameValue.put("gpa", new Double( 2.2 ) );
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+//////			
 ////			
-////			T
+			
+			
+			
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );
@@ -732,29 +759,26 @@ public DBApp( ){
 //			
 			
 			///////////////////////////////////////////////////////////
+			BPlusTree tree = BPlusTree.loadFromFile("gpaIndex.ser");
+			System.out.println(tree.toString());
+			
+			
 			FileInputStream fileIn = new FileInputStream("Student.ser");
-
-            // Step 2: Deserialize the table object
             ObjectInputStream objectIn = new ObjectInputStream(fileIn);
             Table table = (Table) objectIn.readObject();
             objectIn.close();
-			
 			for (String page : table.getPages()) {
 				Page currPage = Page.loadFromFile(page);
 			    Vector<Tuple> tuples = currPage.getTuples();
 			    System.out.println("Number of tuples in page: " + tuples.size());
 			    
 			    for (Tuple tuple : tuples) {
-			        // Print out clustering key column value for each tuple
 			        Object clusteringKeyValue = tuple.getValue(table.getStrClusteringKeyColumn());
 			        System.out.println("Clustering key value: " + clusteringKeyValue);
-			        
-			        // Access tuple attributes as needed
 			        Object attributeValue = tuple.getValue("id");
 			        System.out.println("Attribute Value: " + attributeValue);
 			    }
-			}
-////			
+			}			
 
 		}
 		catch(Exception exp){

@@ -1,8 +1,14 @@
 package database_project1;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.*;
 
-public class BPlusTree <K extends Comparable<K>, E> {
+public class BPlusTree <K extends Comparable<K>, E>  implements Serializable{
 
 	
 	private final int OVERFLOW_BOUND;
@@ -32,6 +38,7 @@ public class BPlusTree <K extends Comparable<K>, E> {
         }
 
 
+        
         BPlusTreeNode newChildNode = root.insert(entry, value);
         if (newChildNode != null) {
             K newRootEntry = newChildNode.getClass().equals(BPlusTreeLeafNode.class)
@@ -49,7 +56,17 @@ public class BPlusTree <K extends Comparable<K>, E> {
         return root.query(entry);
     }
 
-    public List<E> rangeQuery(K startInclude, K endExclude) {
+    
+    
+    
+    
+    public BPlusTreeNode getRoot() {
+		return root;
+	}
+
+	
+
+	public List<E> rangeQuery(K startInclude, K endExclude) {
         if(startInclude.compareTo(endExclude) >= 0){
             throw new IllegalArgumentException("invalid range");
         }
@@ -86,6 +103,14 @@ public class BPlusTree <K extends Comparable<K>, E> {
         return true;
     }
 
+    public void saveToFile1(String filename) {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
+            out.writeObject(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    
     public boolean remove(K entry) {
         if (root == null) {
             return false;
@@ -129,7 +154,7 @@ public class BPlusTree <K extends Comparable<K>, E> {
         return root.toString();
     }
 
-    private abstract class BPlusTreeNode {
+    private abstract class BPlusTreeNode implements Serializable {
 
         protected List<K> entries;
 
@@ -174,7 +199,7 @@ public class BPlusTree <K extends Comparable<K>, E> {
         public abstract void borrow(BPlusTreeNode neighbor, K parentEntry, boolean isLeft);
     }
 
-    private class BPlusTreeNonLeafNode extends BPlusTreeNode {
+    private class BPlusTreeNonLeafNode extends BPlusTreeNode implements Serializable {
 
         public List<BPlusTreeNode> children;
 
@@ -350,7 +375,7 @@ public class BPlusTree <K extends Comparable<K>, E> {
         }
     }
 
-    private class BPlusTreeLeafNode extends BPlusTreeNode {
+    private class BPlusTreeLeafNode extends BPlusTreeNode implements Serializable{
 
         public List<Set<E>> data;
 
@@ -361,7 +386,15 @@ public class BPlusTree <K extends Comparable<K>, E> {
             this.data = data;
         }
 
-        @Override
+        public List<Set<E>> getData() {
+			return data;
+		}
+        public List<K> getEntries() {
+			return entries;
+		}
+
+
+		@Override
         public List<E> rangeQuery(K startInclude, K endExclude) {
             List<E> res = new ArrayList<>();
             int startUpperBound = Math.max(1, entryIndexUpperBound(startInclude));
@@ -527,5 +560,23 @@ public class BPlusTree <K extends Comparable<K>, E> {
             this.isRemoved = isRemoved;
             this.isUnderflow = isUnderflow;
         }
+    }
+    
+    public void saveToFile(String filename) {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(filename))) {
+            out.writeObject(this);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <K extends Comparable<K>, V> BPlusTree<K, V> loadFromFile(String filename) {
+        BPlusTree<K, V> tree = null;
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(filename))) {
+            tree = (BPlusTree<K, V>) in.readObject();
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return tree;
     }
 }
