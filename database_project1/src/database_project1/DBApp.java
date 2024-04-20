@@ -1,14 +1,17 @@
 package database_project1;
 
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 import java.io.File;
 
@@ -83,12 +86,30 @@ public DBApp( ){
 
 
 	// following method creates a B+tree index 
-	public void createIndex(String   strTableName,
-							String   strColName,
-							String   strIndexName) throws DBAppException{
-		
-		throw new DBAppException("not implemented yet");
+public void createIndex(String strTableName, String strColName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
+	    
+	    if (!(createcsv.TableNameExists(strTableName))) {
+	        throw new DBAppException("Table " + strTableName + " does not exist.");
+	    }
+	    
+	    Table table = Table.loadFromFile(strTableName + ".ser");
+	    BPlusTree bPlusTree = new BPlusTree<>();
+
+	    Vector<String> pages = table.getPages();  
+
+	    String indexType = createcsv.getType(strTableName, strColName);
+	    for (String page : pages) {
+	    	Page CurrentPage = Page.loadFromFile(page);
+	        for (Tuple tuple : CurrentPage.getTuples()) {
+	            Object KeyValue = tuple.getValue(strColName);
+	            bPlusTree.insert((Comparable)KeyValue, page);
+	        }
+	    }
+	    bPlusTree.saveToFile(strIndexName + ".ser");
+	    //System.out.print(strIndexName);
+	    createcsv.updateIndex(strTableName, strColName, strIndexName);
 	}
+
 
 
 	// following method inserts one row only. 
@@ -289,103 +310,96 @@ public DBApp( ){
         
         List<Page> targetPage = null;
 		try {
-			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
-//			System.out.println(targetTable.getIndexByClusteringKey(strClusteringKeyValue));
+			targetPage = targetTable.retrievePages();
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	    if (targetPage == null) {
 	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 	    }
 	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-	    // Find the tuple to update
 	    Tuple targetTuple = null;
-	    int pageIndex = 0;
-//	    String indexType = targetTable.getIndexByClusteringKey(strClusteringKeyValue);
-	    
-//	    if ("B+tree".equals(indexType)) {
-//	        // Handle B+ tree indexed table update
-//	        BPlusTree<Object, Object> bPlusTree = targetTable.getBPlusTree();
-//	        if (bPlusTree == null) {
-//	            throw new DBAppException("B+ tree index not found for table: " + strTableName);
-//	        }
-//
-//	        // Convert the clustering key value to the appropriate type
-//	        clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-//	        Object clusteringKeyValueObject = convertToType(strClusteringKeyValue, targetTable.getTypeOfClusterkingKey(clusteringKeyColumn));
-//
-//	        // Update using B+ tree
-//	        if (!bPlusTree.update(clusteringKeyValueObject, null, htblColNameValue)) {
-//	            throw new DBAppException("Failed to update row with clustering key " + strClusteringKeyValue + " in table " + strTableName);
-//	        }
-//
-//	        // Save the updated B+ tree and table
-////	        bPlusTree.saveToFile(strTableName + "_BPlusTree.ser");
-//	        targetTable.saveToFile(strTableName + ".ser");
-//	    } else {
 	    int j = 0;
-	    int tupleIndex = 0;
-		    for(int i = 0;i<targetPage.size();i++) {
-//		    	System.out.println(((Page)targetPage.get(i)).getTuples());
-			    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
-			    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
-			        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
-			        	pageIndex = i;
-			        	tupleIndex = j;
-			            targetTuple = tuple;
+	    int pageLocation = 0;
+	    String clusterKeyType = "";
+	    try {
+			clusterKeyType = targetTable.getTypeOfClusterkingKey(strClusteringKeyValue);
+		} catch (ClassNotFoundException | IOException e1) {
+			e1.printStackTrace();
+		}
+	    
+	    if(clusterKeyType.equals("string")) {
+		    for (Page page : targetPage) {
+		        int low = 0;
+		        int high = page.getTuples().size() - 1;
+		        while (low <= high) {
+		            int mid = (low + high) / 2;
+		            Object primaryKeyValue = page.getTuples().get(mid).getValue(clusteringKeyColumn);
+		            int compareResult = strClusteringKeyValue.compareTo(primaryKeyValue.toString());
+			        if (compareResult == 0) {
+			        	pageLocation = j;
+			            targetTuple = page.getTuples().get(mid);
 			            break;
+			        } else if (compareResult < 0) {
+			            high = mid - 1;
+			        } else {
+			            low = mid + 1;
 			        }
-			        j++;
-			    }
+		        }
+		        j++;
 		    }
+		    }
+	    else {
+		    for (Page page : targetPage) {
+		        int low = 0;
+		        int high = page.getTuples().size() - 1;
+		        while (low <= high) {
+		            int mid = (low + high) / 2;
+		            Object primaryKeyValue = page.getTuples().get(mid).getValue(clusteringKeyColumn);
+		            String primaryKeyString = primaryKeyValue.toString();
+		            if (strClusteringKeyValue.equals(primaryKeyString)) {
+		                targetTuple = page.getTuples().get(mid);
+		                pageLocation = j;
+		                break;
+		            } else if (Integer.parseInt(primaryKeyString) > Integer.parseInt(strClusteringKeyValue)){
+		                high = mid - 1;
+		            } else {
+		                low = mid + 1;
+		            }
+		        }
+		        j++;
+		    }
+	    }
 		    if (targetTuple == null) {
 		        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
 		    }
-		    // Update the tuple with new values
 		    for (String columnName : htblColNameValue.keySet()) {
 		        if (!columnName.equals(targetTable.getStrClusteringKeyColumn())) {
 		        	Object newValue;
-		        	
-		        	newValue = htblColNameValue.get(columnName);
+		            String indexName = "";
+		            newValue = htblColNameValue.get(columnName);
+						try {
+							indexName = targetTable.getIndexName();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+			            if (indexName != null) {
+			            	Object oldValue = targetTuple.getValue(indexName.substring(0, indexName.length()-5));
+			            	Object oldValueName = indexName.substring(0, indexName.length()-5);
+			            	if(oldValueName.equals(columnName)) {
+				                BPlusTree bPlusTree = BPlusTree.loadFromFile(indexName + ".ser");
+				                bPlusTree.remove((Comparable) oldValue,strTableName + pageLocation + ".ser");
+				                bPlusTree.insert((Comparable)newValue, strTableName + pageLocation + ".ser");
+				                bPlusTree.saveToFile(indexName + ".ser");
+				            }
+			            }
 		            targetTuple.updateTuple(columnName, newValue);
 		        }
 		    }
-//			    for (Tuple tuple : ((Page)targetPage.get(pageIndex)).getTuples()) {
-//			    	System.out.println(tuple);
-//			    }
-		    
-		    // Save the updated page back to disk
-//		}
-		int pageIndexForSave = (int) Math.floor(tupleIndex/(targetPage.get(pageIndex)).noOfTuples());
-//		System.out.println(pageIndexForSave);
-	    (targetPage.get(pageIndex)).saveToFile("Student" + pageIndexForSave +".ser");
+	    (targetPage.get(pageLocation)).saveToFile(strTableName + pageLocation +".ser");
 	    targetTable.saveToFile(strTableName + ".ser");
-
-//		try {
-//			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
-//		} catch (ClassNotFoundException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-////		System.out.println(targetPage.size());
-//	    targetTable = Table.loadFromFile(strTableName + ".ser");
-//	    System.out.println(((Page)targetPage.get(0)));
-//	    System.out.println(((Page)targetPage.get(1)));
-////	    System.out.println(((Page)targetPage.get(0)));
-//	    System.out.println(((Page)targetPage.get(2)));
-//		    for (Tuple tuple : ((Page)targetPage.get(0)).getTuples()) {
-////		    	System.out.println(targetPage.get(pageIndex));
-//		    }
-//		throw new DBAppException("not implemented yet");
-
-//		throw new DBAppException("not implemented yet");
 	}
 
 
@@ -653,8 +667,7 @@ public DBApp( ){
 			htblColNameType.put("name", "java.lang.String");
 			htblColNameType.put("gpa", "java.lang.double");
 			dbApp.createTable( strTableName, "id", htblColNameType );
-			
-//			//dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+
 ////
 			
 			//Hashtable htblColNameValue = new Hashtable( );
@@ -663,43 +676,60 @@ public DBApp( ){
 			
 			
 			Hashtable htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 1));
-
-			htblColNameValue.put("name", new String("Ahmed Noor" ) );
+			htblColNameValue.put("id", new Integer(2));
+//
+			htblColNameValue.put("name", new String("Ahmed" ) );
 			htblColNameValue.put("gpa", new Double( 0.5) );
-
-			dbApp.insertIntoTable( strTableName , htblColNameValue );
-
-			htblColNameValue = new Hashtable( );
-			htblColNameValue.put("id", new Integer( 2));
-			htblColNameValue.put("name", new String("Mohamed" ) );
-			htblColNameValue.put("gpa", new Double( 0.95 ) );
+//
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			
-//			
+//			Hashtable htblColNameValue = new Hashtable( );
+			htblColNameValue.clear();
+			htblColNameValue.put("id", new Integer(3));
+//
+			htblColNameValue.put("name", new String("Mohamed" ) );
+			htblColNameValue.put("gpa", new Double( 0.5) );
+			
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			htblColNameValue.clear();
+			htblColNameValue.put("id", new Integer(4));
+//
+			htblColNameValue.put("name", new String("ziyad" ) );
+			htblColNameValue.put("gpa", new Double( 0.5) );
+//
+			dbApp.insertIntoTable( strTableName , htblColNameValue );
+			dbApp.createIndex( strTableName, "gpa", "gpaIndex" );
+//
 //			htblColNameValue = new Hashtable( );
-//			htblColNameValue.put("id", new Integer( 3));
+//			htblColNameValue.put("id", new String("b"));
+//			htblColNameValue.put("name", new String("Mohamed" ) );
+//			htblColNameValue.put("gpa", new Double( 0.95 ) );
+//			dbApp.insertIntoTable( strTableName , htblColNameValue );
+//			
+////			
+//			htblColNameValue = new Hashtable( );
+//			htblColNameValue.put("id", new String("c"));
 //			htblColNameValue.put("name", new String("sadjkasdk" ) );
 //			htblColNameValue.put("gpa", new Double( 2.5 ) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
-//			
+////			
 //			htblColNameValue = new Hashtable( );
-//			htblColNameValue.put("id", new Integer( 4));
+//			htblColNameValue.put("id", new String( "f"));
 //			htblColNameValue.put("name", new String("amr" ) );
 //			htblColNameValue.put("gpa", new Double( 1.8) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //			
 //			htblColNameValue = new Hashtable( );
-//			htblColNameValue.put("id", new Integer( 5));
+//			htblColNameValue.put("id", new String( "g"));
 //			htblColNameValue.put("name", new String("ziyad" ) );
 //			htblColNameValue.put("gpa", new Double( 1.7) );
 //			dbApp.insertIntoTable( strTableName , htblColNameValue );
-			
+//			
 			htblColNameValue = new Hashtable( );
 //			htblColNameValue.put("id", new Integer( 2343434));
 			htblColNameValue.put("name", new String("yousef" ) );
-			htblColNameValue.put("gpa", new Double( 0.75 ) );
-			dbApp.updateTable( strTableName ,"2", htblColNameValue );
+			htblColNameValue.put("gpa", new Double( 2.75 ) );
+			dbApp.updateTable( strTableName ,"4", htblColNameValue );
 			/*
 			Hashtable htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Soroor" ) );

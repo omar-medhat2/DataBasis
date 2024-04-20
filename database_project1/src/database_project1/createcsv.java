@@ -61,11 +61,31 @@ public class createcsv {
         List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
         for (String line : lines) {
             String[] fields = line.split(",");
-            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName) &&(!(fields[5].equals("Null"))||(!(fields[5].equals("NULL"))) || (!(fields[5].equals("null"))))) {
+            if (fields.length >= 3 && fields[0].equals(strTableName) && !(fields[1].equals(strColName)) &&(!(fields[5].equals("Null"))||(!(fields[5].equals("NULL"))) || (!(fields[5].equals("null"))))) {
                 return fields[5];
             }
         }
         return null;
+	}
+	public static String getIndexName(String strTableName, String strColName) throws IOException {
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+        for (String line : lines) {
+            String[] fields = line.split(",");
+            if (fields.length >= 3 && fields[0].equals(strTableName) && !(fields[1].equals(strColName)) &&(!(fields[4].equals("Null"))||(!(fields[4].equals("NULL"))) || (!(fields[4].equals("null"))))) {
+                return fields[4];
+            }
+        }
+        return null;
+	}
+	public static boolean TableNameExists(String tableName) throws IOException {
+		 List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+	        for (String line : lines) {
+	            String[] fields = line.split(",");
+	            if (fields.length >= 3 && fields[0].equals(tableName)) {
+	                return true;
+	            }
+	        }
+	        return false;
 	}
 	public static String getCluster(String strTableName) throws IOException {
         List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
@@ -77,4 +97,41 @@ public class createcsv {
         }
         return null;
 }
+	
+	public static boolean updateIndex(String strTableName, String strColName, String indexName) throws IOException {
+        // Read all lines from the CSV file
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+
+        // Iterate through each line in the CSV file
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            String[] fields = line.split(",");
+
+            // Check if the line corresponds to the given table and column
+            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName)) {
+                // Update the IndexName field with the provided index name
+                fields[4] = indexName;
+                
+                // If an index name is provided, set the IndexType to "B+ Tree"
+                if (indexName != null && !indexName.isEmpty()) {
+                    fields[5] = "B+Tree";
+                } else {
+                    // If no index name is provided, set the IndexType to "Null"
+                    fields[5] = "Null";
+                }
+
+                // Reconstruct the line with updated fields
+                lines.set(i, String.join(",", fields));
+
+                // Write the updated lines back to the CSV file
+                Files.write(Paths.get("table_metadata.csv"), lines);
+                
+                // Return true indicating successful update
+                return true;
+            }
+        }
+
+        // Return false indicating the update was not successful
+        return false;
+    }
 }

@@ -37,14 +37,51 @@ public class Table implements Serializable{
 			return "Page-1.ser";
 		else
 		return pages.lastElement();
-				}
+	}
+	public String getIndexType() throws IOException {
+		String keyColumnName = createcsv.getCluster(strTableName);
+		String keyColumnType = createcsv.getIndexType(strTableName, keyColumnName);
+		if(keyColumnType == "B+tree") {
+			return "B+tree";
+		}
+		return null;
+	}
+	public String getIndexName() throws IOException {
+		String keyColumnName = createcsv.getCluster(strTableName);
+		String keyColumnType = createcsv.getIndexName(strTableName, keyColumnName);
+		return keyColumnType;
+	}
+	public String getTypeOfClusterkingKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
+
+	    String keyColumnName = createcsv.getCluster(strTableName);
+	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
+
+	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
+	    	return "double";
+	    } 
+	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
+	    	return "string";
+	    } 
+	    else {
+	    	return "integer";
+	    }
+	}
 	
-	public List<Page> retrievePageByClusteringKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
+	public List<Page> retrievePages() throws IOException, ClassNotFoundException {
 	    List<Page> currentPage = new ArrayList<Page>();
 
 	        for (int pageIndex = 0; pageIndex < pages.size(); pageIndex++) {
 	            currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
-//	            comparisonResult = Double.compare(Double.parseDouble((String) clusteringKeyValue), (Double) currentPage.max);
+	        }
+
+	    
+	    return currentPage;
+	}
+	public List<String> retrievePageNames() throws IOException, ClassNotFoundException {
+	    List<String> currentPage = new ArrayList<String>();
+
+	        for (int pageIndex = 0; pageIndex < pages.size(); pageIndex++) {
+	            currentPage.add(strTableName + pageIndex + ".ser");
 	        }
 
 	    
