@@ -140,11 +140,15 @@ public class BPlusTree <K extends Comparable<K>, E>  implements Serializable{
         return root.toString();
     }
 
-    private abstract class BPlusTreeNode implements Serializable {
+    public abstract class BPlusTreeNode implements Serializable {
 
         protected List<K> entries;
 
-        protected boolean isUnderflow() {
+        public List<K> getEntries() {
+			return entries;
+		}
+
+		protected boolean isUnderflow() {
             return entries.size() < UNDERFLOW_BOUND;
         }
 

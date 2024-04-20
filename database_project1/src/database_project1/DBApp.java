@@ -8,9 +8,11 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.Vector;
 import java.io.File;
 import java.io.*;
@@ -85,13 +87,11 @@ public DBApp( ){
 
 
 	// following method creates a B+tree index 
-	
-
-	public void createIndex(String strTableName, String strColName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
-	    // Load the table from disk
+		public void createIndex(String strTableName, String strColName, String strIndexName) throws DBAppException, IOException, ClassNotFoundException {
+	    
 	    
 
-	    // Check if the table exists
+	    
 	    if (!(createcsv.TableNameExists(strTableName))) {
 	        throw new DBAppException("Table " + strTableName + " does not exist.");
 	    }
@@ -110,10 +110,9 @@ public DBApp( ){
 	        }
 	    }
 	    
-	    System.out.print(bPlusTree.toString());
+	    //System.out.print(bPlusTree.toString());
 	    bPlusTree.saveToFile(strIndexName + ".ser");
 	    createcsv.updateIndex(strTableName, strColName, strIndexName);
-	    bPlusTree.query(indexType);
 	}
 
 
@@ -363,7 +362,7 @@ public DBApp( ){
 	// htblColNameValue entries are ANDED together
 	
 
-	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
+	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException, ClassNotFoundException {
         boolean tableExists = createcsv.TableNameExists(strTableName);
         if (!tableExists) 
             throw new DBAppException("Table not found: " + strTableName);
@@ -383,7 +382,7 @@ public DBApp( ){
             // Execute deletion logic using indexes
             deleteUsingIndexes(targetTable, htblColNameValue);
         } else {
-            // No indexes found, fallback to original deletion logic
+            // No indexes found, go to linear deletion logic
             originalDeleteLogic(targetTable, htblColNameValue);
         }
 
@@ -402,6 +401,8 @@ private static void originalDeleteLogic(Table table, Hashtable<String, Object> h
 	            throw new DBAppException("Column not found in table: " + attributeName);
 	        Object attributeValue = htblColNameValue.get(attributeName);
 	        String attributeValueType = attributeValue.getClass().getName();
+	        if(columnType.equals("java.lang.double")) 
+	        	columnType = "java.lang.Double";
 	        if (!attributeValueType.equals(columnType)) 
 	            throw new DBAppException("Type mismatch for column: " + attributeName); //Ensure Type Compatibility
 	        
@@ -450,74 +451,68 @@ private static void originalDeleteLogic(Table table, Hashtable<String, Object> h
 	    
 	    targetTable.saveToFile(table.strTableName + ".ser");
 	}
-private static void deleteUsingIndexes(Table table, Hashtable<String, Object> htblColNameValue) {
-    List<String> pagesToDeleteFrom = null;
-
+private static void deleteUsingIndexes(Table table, Hashtable<String, Object> htblColNameValue) throws IOException, ClassNotFoundException, DBAppException {
     // Iterate through each column in the hashtable
     for (String attributeName : htblColNameValue.keySet()) {
         Object attributeValue = htblColNameValue.get(attributeName);
-        String indexName = createcsv.getIndexName(table.getName(), attributeName);
+        String indexName = createcsv.getIndexName(table.strTableName, attributeName);
 
         // Check if an index exists for the current column
         if (indexName != null) {
             // Deserialize the index
-            BPlusTree<Object, List<String>> index = loadIndexFromFile(indexName);
+            BPlusTree index = BPlusTree.loadFromFile(indexName + ".ser");
 
             // Query the index with the attribute value
-            List<String> pages = index.query(attributeValue);
+            List<String> pages = index.query((Comparable) attributeValue);
 
-            // If this is the first index, initialize the list of pages to delete from
-            if (pagesToDeleteFrom == null) {
-                pagesToDeleteFrom = pages;
-            } else {
-                // Perform a logical AND operation to get the common pages
-                pagesToDeleteFrom.retainAll(pages);
-            }
-        }
-    }
+            // Perform deletion based on the pages obtained from index queries
+            if (pages != null) {
+                for (String pageFile : pages) {
+                    Page page = Page.loadFromFile(pageFile);
 
-    // Perform deletion based on the common pages obtained from index queries
-    if (pagesToDeleteFrom != null) {
-        for (String pageFile : pagesToDeleteFrom) {
-            Page page = Page.loadFromFile(pageFile);
+                    Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+                    while (tupleIterator.hasNext()) {
+                        Tuple tuple = tupleIterator.next();
 
-            Iterator<Tuple> tupleIterator = page.getTuples().iterator();
-            while (tupleIterator.hasNext()) {
-                Tuple tuple = tupleIterator.next();
+                        // Check if the tuple matches the deletion conditions
+                        if (tuple.getValue(attributeName).equals(attributeValue)) {
+                            // Remove the tuple from the page
+                            tupleIterator.remove();
 
-                boolean allConditions = true;
-                for (String attributeName : htblColNameValue.keySet()) {
-                    Object attributeValue = htblColNameValue.get(attributeName);
-                    if (!tuple.getValue(attributeName).equals(attributeValue)) {
-                        allConditions = false;
-                        break;
+                            // Remove the index reference since this tuple is deleted
+                            index.remove((Comparable) attributeValue, pageFile);
+                            index.saveToFile(indexName + ".ser");
+                            DBApp	dbApp = new DBApp( );
+                            dbApp.createIndex(table.strTableName,attributeName,indexName);
+                        }
+                    }
+
+                    if (page.getTuples().isEmpty()) {
+                        // Remove the page from the table if it becomes empty
+                        table.getPages().remove(pageFile);
+
+                        // Delete the page file from disk
+                        File file = new File(pageFile);
+                        if (!file.delete()) {
+                            System.err.println("Failed to delete page file: " + pageFile);
+                        }
+                    } else {
+                        // Save the updated page back to disk
+                        page.saveToFile(pageFile);
                     }
                 }
-
-                if (allConditions || htblColNameValue.isEmpty()) { // Empty hashtable means delete everything.
-                    tupleIterator.remove();
-                }
-            }
-
-            if (page.getTuples().isEmpty()) {
-                // Remove the page from the table if it becomes empty
-                table.getPages().remove(pageFile);
-
-                // Delete the page file from disk
-                File file = new File(pageFile);
-                if (!file.delete()) {
-                    System.err.println("Failed to delete page file: " + pageFile);
-                }
-            } else {
-                // Save the updated page back to disk
-                page.saveToFile(pageFile);
             }
         }
     }
+
+    // Save the updated table to disk
+    table.saveToFile(table.strTableName + ".ser");
 }
 
+
 	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException, IOException {
-	    // List to hold the result set
+	    
+		
 	    Vector<Tuple> resultSet = new Vector<>();
 	    
 	    // Iterate over each SQL term
@@ -531,21 +526,143 @@ private static void deleteUsingIndexes(Table table, Hashtable<String, Object> ht
 	        // Load the target table from file
 	        Table targetTable = Table.loadFromFile(arrSQLTerms[i]._strTableName + ".ser");
 	        
+	        String indexName = createcsv.getIndexName(arrSQLTerms[i]._strTableName,arrSQLTerms[i]._strColumnName);
+	        if (indexName == (null) || arrSQLTerms[i]._strOperator.equals("!=")) {
 	        
-	        // Iterate over page file paths in the table
-	        for (String pageFilePath : targetTable.getPages()) {
-	            // Load the page from file
-	            Page page = Page.loadFromFile(pageFilePath);
-	            
-	            // Iterate over tuples in the page
-	            for (Tuple tuple : page.getTuples()) {
-	                // Check if the tuple matches the SQL term criteria
-	                if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
-	                    termResult.add(tuple);
-	                }
-	            }
+		        // Iterate over page file paths in the table
+		        for (String pageFilePath : targetTable.getPages()) {
+		            // Load the page from file
+		            Page page = Page.loadFromFile(pageFilePath);
+		            
+		            // Iterate over tuples in the page
+		            for (Tuple tuple : page.getTuples()) {
+		                // Check if the tuple matches the SQL term criteria
+		                if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
+		                    termResult.add(tuple);
+		                }
+		            }
+		        }
 	        }
 	        
+	        else {
+	        	BPlusTree tree = BPlusTree.loadFromFile(indexName + ".ser");
+	        	List listOfEntries = tree.getRoot().getEntries();
+	        	List<String> pagesForSelection = new ArrayList<>();
+	        	
+	        	switch (arrSQLTerms[i]._strOperator) {
+	        		case "=":
+	        				for(Object entry : listOfEntries) {
+	        					if(arrSQLTerms[i]._objValue.equals(entry)) {
+	        					pagesForSelection = ((tree.query((Comparable) entry)));
+	        					break;
+	        					}
+	        				}
+	        				for(String pageName : pagesForSelection) {
+	        					Page page = Page.loadFromFile(pageName);
+	        					for (Tuple tuple : page.getTuples()) {
+	        						if(tuple.getValue(arrSQLTerms[i]._strColumnName).equals(arrSQLTerms[i]._objValue)) 
+	        							termResult.add(tuple);
+	        					}
+	        				}
+		                break;
+		            case ">":
+						if((createcsv.getType(arrSQLTerms[i]._strTableName, arrSQLTerms[i]._strColumnName)).equals("java.lang.String")) 
+							throw new DBAppException("Unsupported operator  for Strings: " + arrSQLTerms[i]._strOperator);
+	        			
+	        			else {
+	        				for(Object entry : listOfEntries) {
+	        					if(((Number)entry).doubleValue() > ((Number)arrSQLTerms[i]._objValue).doubleValue()) {
+	        					pagesForSelection.addAll(((tree.query((Comparable) entry))));
+	        					}
+
+	        					Set<String> uniquePagesSet = new HashSet<>(pagesForSelection);
+	        					pagesForSelection.clear();
+	        					pagesForSelection.addAll(uniquePagesSet);
+	        				}
+	        				for(String pageName : pagesForSelection) {
+	        					Page page = Page.loadFromFile(pageName);
+	        					for (Tuple tuple : page.getTuples()) {
+	        						if((((Number) tuple.getValue(arrSQLTerms[i]._strColumnName)).doubleValue()) > ((Number)arrSQLTerms[i]._objValue).doubleValue()) 
+	        							termResult.add(tuple);
+	        					}
+	        				}
+	        			}
+		                break;
+		            case ">=":
+						if((createcsv.getType(arrSQLTerms[i]._strTableName, arrSQLTerms[i]._strColumnName)).equals("java.lang.String")) 
+							throw new DBAppException("Unsupported operator for Strings: " + arrSQLTerms[i]._strOperator);
+	        			
+	        			else {
+	        				for(Object entry : listOfEntries) {
+	        					if(((Number)entry).doubleValue() >= ((Number)arrSQLTerms[i]._objValue).doubleValue()) {
+	        					pagesForSelection.addAll(((tree.query((Comparable) entry))));
+	        					}
+
+	        					Set<String> uniquePagesSet = new HashSet<>(pagesForSelection);
+	        					pagesForSelection.clear();
+	        					pagesForSelection.addAll(uniquePagesSet);
+	        				}
+	        				for(String pageName : pagesForSelection) {
+	        					Page page = Page.loadFromFile(pageName);
+	        					for (Tuple tuple : page.getTuples()) {
+	        						if((((Number) tuple.getValue(arrSQLTerms[i]._strColumnName)).doubleValue()) >= ((Number)arrSQLTerms[i]._objValue).doubleValue()) 
+	        							termResult.add(tuple);
+	        					}
+	        				
+	        			}
+	        			}
+		            	break;
+		            case "<":
+		            	if((createcsv.getType(arrSQLTerms[i]._strTableName, arrSQLTerms[i]._strColumnName)).equals("java.lang.String")) 
+		            		throw new DBAppException("Unsupported operator for Strings: " + arrSQLTerms[i]._strOperator);
+	        			
+	        			else {
+	        				for(Object entry : listOfEntries) {
+	        					if(((Number)entry).doubleValue() < ((Number)arrSQLTerms[i]._objValue).doubleValue()) {
+	        					pagesForSelection.addAll(((tree.query((Comparable) entry))));
+	        					}
+
+	        					Set<String> uniquePagesSet = new HashSet<>(pagesForSelection);
+	        					pagesForSelection.clear();
+	        					pagesForSelection.addAll(uniquePagesSet);
+	        				}
+	        				for(String pageName : pagesForSelection) {
+	        					Page page = Page.loadFromFile(pageName);
+	        					for (Tuple tuple : page.getTuples()) {
+	        						if((((Number) tuple.getValue(arrSQLTerms[i]._strColumnName)).doubleValue()) < ((Number)arrSQLTerms[i]._objValue).doubleValue()) 
+	        							termResult.add(tuple);
+	        					}
+	        				}
+	        			}
+		            	break;
+		            case "<=":
+		            	if((createcsv.getType(arrSQLTerms[i]._strTableName, arrSQLTerms[i]._strColumnName)).equals("java.lang.String")) 
+		            		throw new DBAppException("Unsupported operator for Strings: " + arrSQLTerms[i]._strOperator);
+		            	else {
+	        				for(Object entry : listOfEntries) {
+	        					if(((Number)entry).doubleValue() <= ((Number)arrSQLTerms[i]._objValue).doubleValue()) {
+	        					pagesForSelection.addAll(((tree.query((Comparable) entry))));
+	        					}
+
+	        					Set<String> uniquePagesSet = new HashSet<>(pagesForSelection);
+	        					pagesForSelection.clear();
+	        					pagesForSelection.addAll(uniquePagesSet);
+	        				}
+	        				for(String pageName : pagesForSelection) {
+	        					Page page = Page.loadFromFile(pageName);
+	        					for (Tuple tuple : page.getTuples()) {
+	        						if((((Number) tuple.getValue(arrSQLTerms[i]._strColumnName)).doubleValue()) <= ((Number)arrSQLTerms[i]._objValue).doubleValue()) 
+	        							termResult.add(tuple);
+	        					}
+	        				}
+	        			}
+	        			
+		            	break;
+		            default:
+		                
+		            	throw new DBAppException("Unsupported operator: " + arrSQLTerms[i]._strOperator);
+	        	}
+	        }
 	        // Apply logical operation between result tuples and resultSet
 	        if (i == 0) {
 	            resultSet.addAll(termResult);
@@ -715,7 +832,7 @@ private static void deleteUsingIndexes(Table table, Hashtable<String, Object> ht
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(2));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
-			htblColNameValue.put("gpa", new Double( 0.75 ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(3));
@@ -725,7 +842,7 @@ private static void deleteUsingIndexes(Table table, Hashtable<String, Object> ht
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(4));
 			htblColNameValue.put("name", new String("Ahmed Ghandour" ) );
-			htblColNameValue.put("gpa", new Double( 0.45 ) );
+			htblColNameValue.put("gpa", new Double( 0.95 ) );
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 			htblColNameValue = new Hashtable( );
 			htblColNameValue.put("id", new Integer(5));
@@ -756,33 +873,33 @@ private static void deleteUsingIndexes(Table table, Hashtable<String, Object> ht
 			
 			dbApp.createIndex("Student","gpa","gpaIndex");
 			
+			//Hashtable htblColNameForDelete = new Hashtable( );
+			//htblColNameForDelete.put("gpa", new Double( 0.95 ) );
+			//htblColNameForDelete.put("name", new String("Ahmed Noor"));
+			//dbApp.deleteFromTable("Student", htblColNameForDelete);
 			
 			/*
 			htblColNameForDelete = new Hashtable( );
 			htblColNameForDelete.put("name", new String("Ahmed Ghandour" ) );
 			htblColNameForDelete.put("gpa", new Double( 0.75 ) );
 			dbApp.deleteFromTable("Student", htblColNameForDelete);
-			htblColNameForDelete = new Hashtable( );
-			htblColNameForDelete.put("name", new String("Ahmed Noor" ) );
-			htblColNameForDelete.put("gpa", new Double( 0.95 ) );
-			dbApp.deleteFromTable("Student", htblColNameForDelete);
+			
 			*/
 			
 			////testing select
 			
 			SQLTerm[] arrSQLTerms = new SQLTerm[2];
-			arrSQLTerms[0] = new SQLTerm(); // Initialize the first element
+			
+			arrSQLTerms[0] = new SQLTerm(); // Initialize the second element
 			arrSQLTerms[0]._strTableName = "Student";
-			arrSQLTerms[0]._strColumnName= "name";
-			arrSQLTerms[0]._strOperator = "=";
-			arrSQLTerms[0]._objValue = "Ahmed Noor";
-
-			arrSQLTerms[1] = new SQLTerm(); // Initialize the second element
+			arrSQLTerms[0]._strColumnName= "gpa";
+			arrSQLTerms[0]._strOperator = "<";
+			arrSQLTerms[0]._objValue = new String("0.1");
+			arrSQLTerms[1] = new SQLTerm(); // Initialize the first element
 			arrSQLTerms[1]._strTableName = "Student";
-			arrSQLTerms[1]._strColumnName= "gpa";
+			arrSQLTerms[1]._strColumnName= "name";
 			arrSQLTerms[1]._strOperator = "=";
-			arrSQLTerms[1]._objValue = new Double(0.95);
-
+			arrSQLTerms[1]._objValue = "Ahmed Hantoor";
 
 			String[] strarrOperators = new String[1];
 			strarrOperators[0] = "OR";
