@@ -68,7 +68,48 @@ public class Table implements Serializable{
 	    return currentPage;
 	}
 
+	public String getIndexName() throws IOException {
+		String keyColumnName = createcsv.getCluster(strTableName);
+		String keyColumnType = createcsv.getIndexName(strTableName, keyColumnName);
+		return keyColumnType;
+	}
+	public String getTypeOfClusterkingKey(Object clusteringKeyValue) throws IOException, ClassNotFoundException {
+
+	    String keyColumnName = createcsv.getCluster(strTableName);
+	    String keyColumnType = createcsv.getType(strTableName, keyColumnName);
+
+	    if ("java.lang.double".equalsIgnoreCase(keyColumnType)) {
+	    	return "double";
+	    } 
+	    else if ("java.lang.string".equalsIgnoreCase(keyColumnType)) {
+	    	return "string";
+	    } 
+	    else {
+	    	return "integer";
+	    }
+	}
 	
+	public List<Page> retrievePages() throws IOException, ClassNotFoundException {
+	    List<Page> currentPage = new ArrayList<Page>();
+
+	        for (int pageIndex = 0; pageIndex < pages.size(); pageIndex++) {
+	            currentPage.add(Page.loadFromFile(strTableName + pageIndex + ".ser"));
+	        }
+
+	    
+	    return currentPage;
+	}
+	public List<String> retrievePageNames() throws IOException, ClassNotFoundException {
+	    List<String> currentPage = new ArrayList<String>();
+
+	        for (int pageIndex = 0; pageIndex < pages.size(); pageIndex++) {
+	            currentPage.add(strTableName + pageIndex + ".ser");
+	        }
+
+	    
+	    return currentPage;
+	}
+
 	public String getStrClusteringKeyColumn() {
 		return strClusteringKeyColumn;
 	}

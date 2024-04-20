@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 
 class Tuple implements Serializable {
+	
 	private Hashtable<String, Object> tuples;
 	private String clusteringKeyColumn;
 	
@@ -71,7 +72,8 @@ class Tuple implements Serializable {
 
 
 class Page implements Serializable {
-    private static final int N = 2; 
+	
+    private static final int N = 200; 
     private Vector<Tuple> tuples;
     private String strClusteringKeyColumn;
     private Table parentTable;

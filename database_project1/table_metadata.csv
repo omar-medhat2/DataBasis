@@ -1,4 +1,0 @@
-TableName,ColumnName,ColumnType,ClusteringKey,IndexName,IndexType
-Student,gpa,java.lang.double,false,Null,Null
-Student,name,java.lang.String,false,Null,Null
-Student,id,java.lang.Integer,true,Null,Null
