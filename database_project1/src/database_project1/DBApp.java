@@ -675,7 +675,7 @@ public DBApp( ){
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //////			
 ////			
-			System.out.println(createcsv.getType("Student", "gpa"));
+			
 			
 			
 			/*
