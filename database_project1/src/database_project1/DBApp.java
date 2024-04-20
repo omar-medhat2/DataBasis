@@ -140,7 +140,7 @@ public DBApp( ){
 
 	    String clusteringKeyColumnTest = createcsv.getCluster(strTableName);
 		
-		if (createcsv.TableNameExists(strTableName))
+		if (!createcsv.TableNameExists(strTableName))
 		{
 			throw new DBAppException("Table not found: " + strTableName);
 		}
@@ -150,7 +150,7 @@ public DBApp( ){
 
 
 	    
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	    
 	    
 	    
@@ -434,7 +434,11 @@ public DBApp( ){
 	    // Save changes to table file
 	    targetTable.saveToFile(strTableName + ".ser");
 	}
-
+    
+	
+	
+	
+	
    
 
 
@@ -671,7 +675,7 @@ public DBApp( ){
 			dbApp.insertIntoTable( strTableName , htblColNameValue );
 //////			
 ////			
-			
+			System.out.println(createcsv.getType("Student", "gpa"));
 			
 			
 			/*
