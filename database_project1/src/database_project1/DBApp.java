@@ -140,15 +140,16 @@ public DBApp( ){
 
 	    String clusteringKeyColumnTest = createcsv.getCluster(strTableName);
 		
-		
+		if (createcsv.TableNameExists(strTableName))
+		{
+			throw new DBAppException("Table not found: " + strTableName);
+		}
 
 
 	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
 
 
-	    if (targetTable == null) {
-	        throw new DBAppException("Table not found: " + strTableName);
-	    }
+	    
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	    
 	    
