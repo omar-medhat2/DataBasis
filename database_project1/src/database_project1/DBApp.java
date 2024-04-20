@@ -26,459 +26,150 @@ public DBApp( ){
 		
 	}
 
-	public int getPageNumber(String pageName) {
-	    StringBuilder pageNumberStr = new StringBuilder();
-	    boolean isNegative = false;
-
-	    for (int i = 0; i < pageName.length(); i++) {
-	        char ch = pageName.charAt(i);
-	        if (Character.isDigit(ch) || (ch == '-' && pageNumberStr.length() == 0)) {
-	            // Include digits and allow the negative sign only if it's the first character
-	            if (ch == '-') {
-	                isNegative = true;
-	            } else {
-	                pageNumberStr.append(ch);
-	            }
-	        } else if (pageNumberStr.length() > 0) {
-	            // If a digit or negative sign has been found previously, stop when a non-digit character is encountered
-	            break;
-	        }
-	    }
-
-	    // Convert the extracted string of digits to an integer
-	    int pageNumber = pageNumberStr.length() > 0 ? Integer.parseInt(pageNumberStr.toString()) : 0;
-
-	    // If a negative sign was found, make the page number negative
-	    if (isNegative) {
-	        pageNumber *= -1;
-	    }
-
-	    return pageNumber;
-	}
-	// following method creates one table only
-	// strClusteringKeyColumn is the name of the column that will be the primary
-	// key and the clustering column as well. The data type of that column will
-	// be passed in htblColNameType
-	// htblColNameValue will have the column name as key and the data 
-	// type as value
+		public void updateTable(String strTableName, 
+				String strClusteringKeyValue,
+				Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
 	
-
-	public static void createTable(String strTableName, 
-	                                String strClusteringKeyColumn,  
-	                                Hashtable<String,String> htblColNameType) throws DBAppException {
-	    // Check if the table file already exists
-	    File tableFile = new File(strTableName + ".ser");
-	    if (tableFile.exists()) {
-	        throw new DBAppException("Table already exists: " + strTableName);
-	    }
-
-	    // Create a new table
-	    Table newTable = new Table();
-	    newTable.strTableName = strTableName;
-	    newTable.strClusteringKeyColumn = strClusteringKeyColumn;
-	    createcsv.addtoCSV(newTable.strTableName, htblColNameType, strClusteringKeyColumn);
-	    newTable.saveToFile(strTableName + ".ser");
+	Table targetTable = Table.loadFromFile(strTableName + ".ser");
+	if (targetTable == null) {
+	throw new DBAppException("Table not found: " + strTableName);
 	}
-
-
-
-	// following method creates a B+tree index 
-	public void createIndex(String   strTableName,
-							String   strColName,
-							String   strIndexName) throws DBAppException{
-		
-		throw new DBAppException("not implemented yet");
+	
+	List<Page> targetPage = null;
+	try {
+	targetPage = targetTable.retrievePages();
+	} catch (ClassNotFoundException e) {
+	e.printStackTrace();
+	} catch (IOException e) {
+	e.printStackTrace();
 	}
-
-
-	// following method inserts one row only. 
-	// htblColNameValue must include a value for the primary key
-
-	public void insertIntoTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
-	    // Get the clustering key column from metadata
-	    String clusteringKeyColumn = createcsv.getCluster(strTableName);
-		
-		
-
-	    // Check if clustering key column exists
-	    if (clusteringKeyColumn == null) {
-	        throw new DBAppException("Clustering key column not found for table: " + strTableName);
-	    }
-
-	    // Load the target table from file
-	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
-
-	    // Check if the target table exists
-	    if (targetTable == null) {
-	        throw new DBAppException("Table not found: " + strTableName);
-	    }
-
-	    // Get the clustering key value
-	    Object clusteringKeyValue = htblColNameValue.get(clusteringKeyColumn);
-
-	    // Initialize variables
-	    Page targetPage = null;
-
-	    // Iterate over pages in the table
-	    for (String page : targetTable.getPages()) {
-	        Page currPage = Page.loadFromFile(page);
-	        Tuple lastTuple = currPage.getLastTuple();
-	        Object primaryKeyValue = lastTuple.getValue(clusteringKeyColumn);
-	        if (!currPage.isFull()) {
-	            targetPage = currPage;
-	            break;
-	        }
-	    }
-
-	    // If no suitable page is found, create a new page
-	    if (targetPage == null) {
-	        targetPage = new Page();
-	        String lastPage = targetTable.getLastPage();
-	        int lastPageNumber = getPageNumber(lastPage);
-	        int incPageNumber = lastPageNumber + 1;
-	        targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-	        targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-	    }
-
-	    // Check if the target page is full
-	    if (!targetPage.isFull()) {
-	        Vector<Tuple> temp = new Vector<>();
-	        boolean inserted = false;
-
-	        // Iterate over tuples in the target page
-	        for (Tuple tuple : targetPage.getTuples()) {
-	            Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-	            // Compare primary key values to find the correct position to insert the new tuple
-	            if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	                inserted = true;
-	            }
-	            temp.add(tuple);
-	        }
-
-	        // If the new tuple hasn't been inserted yet, add it to the end
-	        if (!inserted) {
-	            temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	        }
-
-	        // Update the target page with the new tuples
-	        targetPage.setTuples(temp);
+	if (targetPage == null) {
+	throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	}
+	for (String attributeName : htblColNameValue.keySet()) {
+	String columnType = "";
+	try {
+	columnType = createcsv.getType(strTableName, attributeName);
+	} catch (IOException e) {
+	e.printStackTrace();
+	}
+	if (columnType == null ) 
+	throw new DBAppException("Column not found in table: " + attributeName);
+	Object attributeValue = htblColNameValue.get(attributeName);
+	String attributeValueType = attributeValue.getClass().getName();
+	if(columnType.equals("java.lang.double")) {
+	columnType = "java.lang.Double";
+	}
+	if (!attributeValueType.equals(columnType)) 
+	throw new DBAppException("Type mismatch for column: " + attributeName);
+	}
+	String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
+	Tuple targetTuple = null;
+	int j = 0;
+	int pageLocation = 0;
+	String clusterKeyType = "";
+	try {
+	clusterKeyType = targetTable.getTypeOfClusterkingKey(strClusteringKeyValue);
+	} catch (ClassNotFoundException | IOException e1) {
+	e1.printStackTrace();
+	}
+	
+	if(clusterKeyType.equals("string")) {
+	for (Page page : targetPage) {
+	int low = 0;
+	int high = page.getTuples().size() - 1;
+	while (low <= high) {
+	    int mid = (low + high) / 2;
+	    Object primaryKeyValue = page.getTuples().get(mid).getValue(clusteringKeyColumn);
+	    int compareResult = strClusteringKeyValue.compareTo(primaryKeyValue.toString());
+	    if (compareResult == 0) {
+	    	pageLocation = j;
+	        targetTuple = page.getTuples().get(mid);
+	        break;
+	    } else if (compareResult < 0) {
+	        high = mid - 1;
 	    } else {
-	        // If the target page is full
-	        if (targetTable.getPages().indexOf(targetPage) == targetTable.getPages().size() - 1) {
-	            // If it's the last page, create a new page
-	            targetPage = new Page();
-	            String lastPage = targetTable.getLastPage();
-	            int lastPageNumber = getPageNumber(lastPage);
-	            int incPageNumber = lastPageNumber + 1;
-	            targetPage.saveToFile(strTableName + (incPageNumber) + ".ser");
-	            targetTable.getPages().add(strTableName + (incPageNumber) + ".ser");
-	        } else {
-	            // Otherwise, shift a row down to the following page
-	            String nextPageString = targetTable.getPages().get(targetTable.getPages().indexOf(targetPage) + 1);
-	            Page nextPage = Page.loadFromFile(nextPageString);
-	            Tuple shiftedTuple = targetPage.getLastTuple();
-	            targetPage.getTuples().remove(targetPage.getTuples().size() - 1);
-	            Vector<Tuple> temp = new Vector<>();
-	            boolean inserted = false;
-
-	            // Iterate through existing tuples to find the correct position to insert the new tuple
-	            for (Tuple tuple : targetPage.getTuples()) {
-	                // Compare primary key values
-	                Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);
-	                if (((Comparable) clusteringKeyValue).compareTo(primaryKeyValue) < 0 && !inserted) {
-	                    temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	                    inserted = true;
-	                }
-	                temp.add(tuple);
-	            }
-
-	            // If the new tuple hasn't been inserted yet, add it to the end
-	            if (!inserted) {
-	                temp.add(new Tuple(htblColNameValue,clusteringKeyColumn));
-	            }
-
-	            // Update the target page with the new tuples
-	            targetPage.setTuples(temp);
-
-	            Vector<Tuple> tmp = new Vector<>();
-	            tmp.add(shiftedTuple);
-	            for (Tuple tuple : nextPage.getTuples()) {
-	                if (!tuple.equals(shiftedTuple)) {
-	                    tmp.add(tuple);
-	                }
-	            }
-	            nextPage.setTuples(tmp);
-	        }
+	        low = mid + 1;
 	    }
-
-	    // Save changes to files
-	    targetPage.saveToFile("Student0.ser");
-	    targetTable.saveToFile(strTableName + ".ser");
-
+	}
+	j++;
+	}
+	}
+	else {
+	for (Page page : targetPage) {
+	int low = 0;
+	int high = page.getTuples().size() - 1;
+	while (low <= high) {
+	    int mid = (low + high) / 2;
+	    Object primaryKeyValue = page.getTuples().get(mid).getValue(clusteringKeyColumn);
+	    String primaryKeyString = primaryKeyValue.toString();
+	    if (strClusteringKeyValue.equals(primaryKeyString)) {
+	        targetTuple = page.getTuples().get(mid);
+	        pageLocation = j;
+	        break;
+	    } else if (Integer.parseInt(primaryKeyString) > Integer.parseInt(strClusteringKeyValue)){
+	        high = mid - 1;
+	    } else {
+	        low = mid + 1;
+	    }
+	}
+	j++;
+	}
+	}
+	if (targetTuple == null) {
+	throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
+	}
+	for (String columnName : htblColNameValue.keySet()) {
+	if (!columnName.equals(targetTable.getStrClusteringKeyColumn())) {
+		Object newValue;
+	    String indexName = "";
+	    newValue = htblColNameValue.get(columnName);
+			try {
+				indexName = targetTable.getIndexName();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+	        if (indexName != null) {
+	        	Object oldValue = targetTuple.getValue(indexName.substring(0, indexName.length()-5));
+	        	Object oldValueName = indexName.substring(0, indexName.length()-5);
+	        	if(oldValueName.equals(columnName)) {
+	                BPlusTree bPlusTree = BPlusTree.loadFromFile(indexName + ".ser");
+	                bPlusTree.remove((Comparable) oldValue,strTableName + pageLocation + ".ser");
+	                bPlusTree.insert((Comparable)newValue, strTableName + pageLocation + ".ser");
+	                bPlusTree.saveToFile(indexName + ".ser");
+	            }
+	        }
+	    targetTuple.updateTuple(columnName, newValue);
+	}
+	}
+	(targetPage.get(pageLocation)).saveToFile(strTableName + pageLocation +".ser");
+	targetTable.saveToFile(strTableName + ".ser");
 	}
 
 
-	// following method updates one row only
-	// htblColNameValue holds the key and new value 
-	// htblColNameValue will not include clustering key as column name
-	// strClusteringKeyValue is the value to look for to find the row to update.
-	public void updateTable(String strTableName, 
-							String strClusteringKeyValue,
-							Hashtable<String,Object> htblColNameValue   )  throws DBAppException{
-
-		Table targetTable = Table.loadFromFile(strTableName + ".ser");
-        if (targetTable == null) {
-            throw new DBAppException("Table not found: " + strTableName);
-        }
-        
-        List<Page> targetPage = null;
-		try {
-			targetPage = targetTable.retrievePageByClusteringKey(strClusteringKeyValue);
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	    if (targetPage == null) {
-	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
-	    }
-	    String clusteringKeyColumn = targetTable.getStrClusteringKeyColumn();
-	    // Find the tuple to update
-	    Tuple targetTuple = null;
-	    int pageIndex = 0;
-	    for(int i = 0;i<targetPage.size();i++) {
-		    for (Tuple tuple : ((Page)targetPage.get(i)).getTuples()) {
-//		    	System.out.println(tuple);
-		    	Object primaryKeyValue = tuple.getValue(clusteringKeyColumn);;
-		        if (strClusteringKeyValue.equals(primaryKeyValue.toString())) {
-		        	pageIndex = i;
-		            targetTuple = tuple;
-		            break;
-		        }
-		    }
-	    }
-	    if (targetTuple == null) {
-	        throw new RuntimeException("Row with clustering key " + strClusteringKeyValue + " not found in table " + strTableName);
-	    }
-	    
-	    (targetPage.get(pageIndex)).saveToFile("Student0.ser");
-	    targetTable.saveToFile(strTableName + ".ser");
-
-//		throw new DBAppException("not implemented yet");
-
-//		throw new DBAppException("not implemented yet");
-	}
-
-
-	// following method could be used to delete one or more rows.
-	// htblColNameValue holds the key and value. This will be used in search 
-	// to identify which rows/tuples to delete. 	
-
-	    
-
-	// htblColNameValue entries are ANDED together
-	
-
-	public static void deleteFromTable(String strTableName, Hashtable<String,Object> htblColNameValue) throws DBAppException {
-	    // Load the target table from file
-	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
-
-	    // Check if the target table exists
-	    if (targetTable == null) 
-	        throw new DBAppException("Table not found: " + strTableName);
-	    
-
-	    // Iterate over page files in the table
-	    for (String pageFile : targetTable.getPages()) {
-	    	
-	    	
-	        
-	        Page page = Page.loadFromFile(pageFile);
-
-	        // Iterate over tuples in the page
-	        Iterator<Tuple> tupleIterator = page.getTuples().iterator();
-	        while (tupleIterator.hasNext()) {
-	            Tuple tuple = tupleIterator.next();
-
-	            // Check if the tuple matches all conditions in the hashtable
-	            boolean allConditions = true;
-	            for (String attributeName : htblColNameValue.keySet()) {
-	                Object attributeValue = htblColNameValue.get(attributeName);
-	                if (!tuple.getValue(attributeName).equals(attributeValue)) {
-	                    allConditions = false;
-	                    break;
-	                }
-	            }
-
-	            // If the tuple matches all conditions, remove it from the tuple vector
-	            if (allConditions) {
-	                tupleIterator.remove();
-	            }
-	        }
-
-	        // If the page is empty after removing tuples, remove it from the table
-	        if (page.getTuples().isEmpty()) {
-	            targetTable.getPages().remove(pageFile);
-	            // Delete the page file from the file system
-	            File file = new File(pageFile);
-	            if (!file.delete()) 
-	                System.err.println("Failed to delete page file: " + pageFile);
-	            if (targetTable.getPages().isEmpty()) 
-		            return;
-	        } else {
-	            // Save changes to page file if it's not empty
-	            page.saveToFile(pageFile);
-	        }
-	    }
-
-	    // Save changes to table file
-	    targetTable.saveToFile(strTableName + ".ser");
-	}
+// following method could be used to delete one or more rows.
+// htblColNameValue holds the key and value. This will be used in search 
+// to identify which rows/tuples to delete. 	
 
 
 
+// htblColNameValue entries are ANDED together
 
-	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException {
-	    // List to hold the result set
-	    Vector<Tuple> resultSet = new Vector<>();
-
-	    // Iterate over each SQL term
-	    for (int i = 0; i < arrSQLTerms.length; i++) {
-	        // Get the result tuples for the current SQL term
-	        Vector<Tuple> termResult = new Vector<>();
-	        
-	        
-	        // Load the target table from file
-	        Table targetTable = Table.loadFromFile(arrSQLTerms[i]._strTableName + ".ser");
-	        
-	        // Check if the table exists
-	        if (targetTable == null) {
-	            throw new DBAppException("Table not found: " + arrSQLTerms[i]._strTableName);
-	        }
-	        
-	        // Iterate over page file paths in the table
-	        for (String pageFilePath : targetTable.getPages()) {
-	            // Load the page from file
-	            Page page = Page.loadFromFile(pageFilePath);
-	            
-	            // Iterate over tuples in the page
-	            for (Tuple tuple : page.getTuples()) {
-	                // Check if the tuple matches the SQL term criteria
-	                if (tupleMatchesCriteria(tuple, arrSQLTerms[i])) {
-	                    termResult.add(tuple);
-	                }
-	            }
-	        }
-	        
-	        // Apply logical operation between result tuples and resultSet
-	        if (i == 0) {
-	            resultSet.addAll(termResult);
-	        } else {
-	            String operator = strarrOperators[i - 1];
-	            Vector<Tuple> result = new Vector<>();
-	            
-	            switch (operator) {
-	                case "AND":
-	                    for (Tuple tuple : resultSet) {
-	                        if (containsTupleWithClusteringKey(termResult, tuple)) {
-	                            result.add(tuple);
-	                        }
-	                    }
-	                    resultSet = result;
-	                    break;
-	                    
-	                case "OR":
-	                    result.addAll(resultSet);
-	                    for (Tuple tuple : termResult) {
-	                        if (!containsTupleWithClusteringKey(result, tuple)) {
-	                            result.add(tuple);
-	                        }
-	                    }
-	                    resultSet = result;
-	                    break;
-	                    
-	                case "XOR":
-	                    for (Tuple tuple : resultSet) {
-	                        if (!containsTupleWithClusteringKey(termResult, tuple)) {
-	                            result.add(tuple);
-	                        }
-	                    }
-	                    for (Tuple tuple : termResult) {
-	                        if (!containsTupleWithClusteringKey(resultSet, tuple)) {
-	                            result.add(tuple);
-	                        }
-	                    }
-	                    resultSet = result;
-	                    break;
-	                    
-	                default:
-	                    throw new IllegalArgumentException("Unsupported operator: " + operator);
-	            }
-	        }
-
-	        // Method to check if a vector of tuples contains a tuple with the same clustering key value
-	        
-	    }
-
-	    return resultSet.iterator();
-
-	}
-
-	private boolean containsTupleWithClusteringKey(Vector<Tuple> tuples, Tuple targetTuple) {
-        Object targetKeyValue = targetTuple.getClusteringKeyValue();
-        for (Tuple tuple : tuples) {
-            Object keyValue = tuple.getClusteringKeyValue();
-            if (keyValue.equals(targetKeyValue)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-
-	private boolean tupleMatchesCriteria(Tuple tuple, SQLTerm sqlTerm) throws DBAppException{
-	    
-	    Object tupleValue = tuple.getValue(sqlTerm._strColumnName);
-	    
-	    
-	    if (tupleValue instanceof String) {
-	        
-	        if (sqlTerm._strOperator.equals("=")) {
-	            return tupleValue.equals(sqlTerm._objValue);
-	        } else if (sqlTerm._strOperator.equals("!=")) {
-	            return !tupleValue.equals(sqlTerm._objValue);
-	        } else {
-	            
-	        	throw new DBAppException("Unsupported operator for strings: " + sqlTerm._strOperator);
-	        }
-	    } else if (tupleValue instanceof Number && sqlTerm._objValue instanceof Number) {
-	       
-	        double tupleDouble = ((Number) tupleValue).doubleValue();
-	        double queryDouble = ((Number) sqlTerm._objValue).doubleValue();
-	        switch (sqlTerm._strOperator) {
-	            case "=":
-	                return tupleDouble == queryDouble;
-	            case "!=":
-	                return tupleDouble != queryDouble;
-	            case ">":
-	                return tupleDouble > queryDouble;
-	            case ">=":
-	                return tupleDouble >= queryDouble;
-	            case "<":
-	                return tupleDouble < queryDouble;
-	            case "<=":
-	                return tupleDouble <= queryDouble;
-	            default:
-	                
-	            	throw new DBAppException("Unsupported operator: " + sqlTerm._strOperator);
-	        }
-	    } else 
-	        throw new DBAppException("Invalid Comparison: " + tupleValue.getClass().getName());
-	    
-	}
+private Object convertToType(String value, String type) {
+// Convert string value to the specified type
+// You might need to add more type conversions based on your supported types
+switch (type.toLowerCase()) {
+case "integer":
+return Integer.parseInt(value);
+case "double":
+return Double.parseDouble(value);
+case "string":
+return value;
+// Add more cases as needed
+default:
+throw new IllegalArgumentException("Unsupported type: " + type);
+}
+}
 	
 	public static void main( String[] args ){
 		
