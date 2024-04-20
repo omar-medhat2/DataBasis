@@ -113,6 +113,7 @@ public DBApp( ){
 	    System.out.print(bPlusTree.toString());
 	    bPlusTree.saveToFile(strIndexName + ".ser");
 	    createcsv.updateIndex(strTableName, strColName, strIndexName);
+	    bPlusTree.query(indexType);
 	}
 
 
@@ -359,22 +360,44 @@ public DBApp( ){
 	// following method could be used to delete one or more rows.
 	// htblColNameValue holds the key and value. This will be used in search 
 	// to identify which rows/tuples to delete. 	
-
-	    
-
 	// htblColNameValue entries are ANDED together
 	
 
 	public static void deleteFromTable(String strTableName, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
-	    
+        boolean tableExists = createcsv.TableNameExists(strTableName);
+        if (!tableExists) 
+            throw new DBAppException("Table not found: " + strTableName);
+
+        Table targetTable = Table.loadFromFile(strTableName + ".ser");
+
+        // Check if any column has an index
+        boolean hasIndex = false;
+        for (String attributeName : htblColNameValue.keySet()) {
+            if (createcsv.getIndexName(strTableName, attributeName) != null) {
+                hasIndex = true;
+                break;
+            }
+        }
+
+        if (hasIndex) {
+            // Execute deletion logic using indexes
+            deleteUsingIndexes(targetTable, htblColNameValue);
+        } else {
+            // No indexes found, fallback to original deletion logic
+            originalDeleteLogic(targetTable, htblColNameValue);
+        }
+
+        // Save the updated table back to file
+        targetTable.saveToFile(strTableName + ".ser");
+    }
+
+
+private static void originalDeleteLogic(Table table, Hashtable<String, Object> htblColNameValue) throws DBAppException, IOException {
 		
-		boolean TableExists = createcsv.TableNameExists(strTableName);
-	    if (!TableExists) 
-	        throw new DBAppException("Table not found: " + strTableName);
 	    boolean EmptyHashtable = htblColNameValue.isEmpty();
 	
 	    for (String attributeName : htblColNameValue.keySet()) {
-	        String columnType = createcsv.getType(strTableName, attributeName); //column names in the hashtable are valid for the table
+	        String columnType = createcsv.getType(table.strTableName, attributeName); //column names in the hashtable are valid for the table
 	        if (columnType == null ) 
 	            throw new DBAppException("Column not found in table: " + attributeName);
 	        Object attributeValue = htblColNameValue.get(attributeName);
@@ -383,7 +406,7 @@ public DBApp( ){
 	            throw new DBAppException("Type mismatch for column: " + attributeName); //Ensure Type Compatibility
 	        
 	    }
-	    Table targetTable = Table.loadFromFile(strTableName + ".ser");
+	    Table targetTable = Table.loadFromFile(table.strTableName + ".ser");
 	    Iterator<String> pageIterator = targetTable.getPages().iterator();
 	    while (pageIterator.hasNext()) {
 	        String pageFile = pageIterator.next();
@@ -415,9 +438,9 @@ public DBApp( ){
 	            pageIterator.remove(); 
 	            
 	            File file = new File(pageFile);
-	            if (!file.delete()) {
+	            if (!file.delete()) 
 	                System.err.println("Failed to delete page file: " + pageFile);
-	            }
+	            
 	        } else {
 	            
 	            page.saveToFile(pageFile);
@@ -425,11 +448,73 @@ public DBApp( ){
 	    }
 
 	    
-	    targetTable.saveToFile(strTableName + ".ser");
+	    targetTable.saveToFile(table.strTableName + ".ser");
 	}
+private static void deleteUsingIndexes(Table table, Hashtable<String, Object> htblColNameValue) {
+    List<String> pagesToDeleteFrom = null;
 
+    // Iterate through each column in the hashtable
+    for (String attributeName : htblColNameValue.keySet()) {
+        Object attributeValue = htblColNameValue.get(attributeName);
+        String indexName = createcsv.getIndexName(table.getName(), attributeName);
 
+        // Check if an index exists for the current column
+        if (indexName != null) {
+            // Deserialize the index
+            BPlusTree<Object, List<String>> index = loadIndexFromFile(indexName);
 
+            // Query the index with the attribute value
+            List<String> pages = index.query(attributeValue);
+
+            // If this is the first index, initialize the list of pages to delete from
+            if (pagesToDeleteFrom == null) {
+                pagesToDeleteFrom = pages;
+            } else {
+                // Perform a logical AND operation to get the common pages
+                pagesToDeleteFrom.retainAll(pages);
+            }
+        }
+    }
+
+    // Perform deletion based on the common pages obtained from index queries
+    if (pagesToDeleteFrom != null) {
+        for (String pageFile : pagesToDeleteFrom) {
+            Page page = Page.loadFromFile(pageFile);
+
+            Iterator<Tuple> tupleIterator = page.getTuples().iterator();
+            while (tupleIterator.hasNext()) {
+                Tuple tuple = tupleIterator.next();
+
+                boolean allConditions = true;
+                for (String attributeName : htblColNameValue.keySet()) {
+                    Object attributeValue = htblColNameValue.get(attributeName);
+                    if (!tuple.getValue(attributeName).equals(attributeValue)) {
+                        allConditions = false;
+                        break;
+                    }
+                }
+
+                if (allConditions || htblColNameValue.isEmpty()) { // Empty hashtable means delete everything.
+                    tupleIterator.remove();
+                }
+            }
+
+            if (page.getTuples().isEmpty()) {
+                // Remove the page from the table if it becomes empty
+                table.getPages().remove(pageFile);
+
+                // Delete the page file from disk
+                File file = new File(pageFile);
+                if (!file.delete()) {
+                    System.err.println("Failed to delete page file: " + pageFile);
+                }
+            } else {
+                // Save the updated page back to disk
+                page.saveToFile(pageFile);
+            }
+        }
+    }
+}
 
 	public Iterator<Tuple> selectFromTable(SQLTerm[] arrSQLTerms, String[] strarrOperators) throws DBAppException, IOException {
 	    // List to hold the result set
@@ -569,6 +654,7 @@ public DBApp( ){
 	}
 	
 	
+    
 	
 	public static void main( String[] args ){
 		

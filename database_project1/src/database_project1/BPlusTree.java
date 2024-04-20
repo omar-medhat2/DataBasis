@@ -17,7 +17,12 @@ public class BPlusTree <K extends Comparable<K>, E>  implements Serializable{
 
     private BPlusTreeNode root;
 
-    public BPlusTree(int order) {
+    public BPlusTreeNode getRoot() {
+		return root;
+	}
+
+
+	public BPlusTree(int order) {
         if(order < 3){
             throw new IllegalArgumentException("The order of BPlus Tree must be greater than or equal to 3");
         }

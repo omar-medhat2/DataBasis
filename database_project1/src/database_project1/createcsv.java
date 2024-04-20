@@ -114,5 +114,26 @@ public class createcsv {
         // Return false indicating the update was not successful
         return false;
     }
+	
+	public static String getIndexName(String strTableName, String strColName) throws IOException {
+        // Read all lines from the CSV file
+        List<String> lines = Files.readAllLines(Paths.get("table_metadata.csv"));
+
+        // Iterate through each line in the CSV file
+        for (String line : lines) {
+            String[] fields = line.split(",");
+
+            // Check if the line corresponds to the given table and column
+            if (fields.length >= 3 && fields[0].equals(strTableName) && fields[1].equals(strColName)) {
+                // Check if an index name is present
+                if (fields.length >= 6 && !fields[5].equals("Null")) {
+                    // Return the index name
+                    return fields[4];
+                }
+            }
+        }
+        // No index found for the given table and column
+        return null;
+    }
 
 }
